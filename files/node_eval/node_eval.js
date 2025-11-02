@@ -1377,15 +1377,6 @@ function draw_node_eval() {
         last_eval_diff = eval_diff;
     }
 
-    // Livro de aberturas
-    if (eval_node.depth <= 10) {
-        load_book_moves();
-
-        if (is_book_move(eval_node.move)) {
-            eval_icon = book_img;
-        }
-    }
-
     if (eval_node === undefined || eval_node === null) {
         return;
     }
@@ -1403,68 +1394,52 @@ function draw_node_eval() {
     }
 }
 
+
 // ===================================
 // FUNÇÕES AUXILIARES
 // ===================================
 
 function load_book_moves() {
+    // 🔥 FUNÇÃO DESABILITADA - NÃO FILTRAR NADA
+    // Esta função originalmente limitava as setas baseado no livro de aberturas
+    // AGORA: Apenas atualiza o nome da abertura, SEM FILTRAR SETAS
+    
+    if(hub.tree.node.parent === null) {
+        openingname_text.innerHTML = "Starting Position";
+        return;
+    }
+
+    // Apenas mostra o nome da abertura (não afeta as setas)
     try {
-        if (hub.tree.node.parent === null) {
-            openingname_text.innerHTML = "Starting Position";
-            return;
+        if (config.looker_api === "lichess_masters" || config.looker_api === "lichess_plebs") {
+            let current_node = hub.tree.node;
+            let current_entry = hub.looker.lookup(config.looker_api, current_node.board);
+
+            if(current_entry !== null) {
+                while(current_entry.opening === "null" && current_node.parent !== null) {
+                    current_node = current_node.parent;
+                    current_entry = hub.looker.lookup(config.looker_api, current_node.board);
+
+                    if(current_entry === null) {
+                        break;
+                    }
+                }
+
+                openingname_text.innerHTML = current_entry?.opening;
+            }
         }
     } catch (e) {
-        return;
+        console.warn('Erro ao carregar nome da abertura:', e);
     }
 
-    let ok = true;
+    // 🔥 CRÍTICO: NUNCA POPULAR O CACHE (isso limitava as setas!)
+    book_moves_cache = null;
+    book_moves_cache_node_id = null;
+}
 
-    if (config.looker_api !== "lichess_masters" && config.looker_api !== "lichess_plebs") {
-        ok = false;
-    }
-
-    let current_node = hub.tree.node;
-    let current_entry = hub.looker.lookup(config.looker_api, current_node.board);
-
-    if (current_entry !== null) {
-        while (current_entry.opening === "null" && current_node.parent !== null) {
-            current_node = current_node.parent;
-            current_entry = hub.looker.lookup(config.looker_api, current_node.board);
-
-            if (current_entry === null) {
-                break;
-            }
-        }
-
-        try {
-            openingname_text.innerHTML = current_entry?.opening;
-        } catch (e) { }
-    }
-
-    let entry = hub.looker.lookup(config.looker_api, hub.tree.node.parent.board);
-
-    if (!entry) {
-        ok = false;
-    }
-
-    if (!ok) {
-        book_moves_cache = null;
-        book_moves_cache_node_id = null;
-        return;
-    }
-
-    if (!book_moves_cache || book_moves_cache_node_id !== hub.tree.node.parent.id) {
-        let tmp = {};
-        for (let move of Object.keys(entry.moves)) {
-            if (!hub.tree.node.parent.board.illegal(move)) {
-                if (tmp[move] === undefined) {
-                    tmp[move] = { move: move };
-                }
-            }
-        }
-        book_moves_cache_node_id = hub.tree.node.parent.id;
-        book_moves_cache = Object.values(tmp);
-    }
+function is_book_move(move) {
+    // 🔥 SEMPRE RETORNA FALSE - NÃO FILTRAR NADA
+    return false;
 }
 
 function is_book_move(move) {
