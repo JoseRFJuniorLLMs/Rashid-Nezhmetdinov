@@ -382,7 +382,7 @@ window.addEventListener("resize", (event) => {
 });
 
 window.addEventListener("error", (event) => {
-	alert(messages.uncaught_exception);
+	//alert(messages.uncaught_exception);
 }, {once: true});
 
 // Forced garbage collection. For reasons I can't begin to fathom, Node isn't

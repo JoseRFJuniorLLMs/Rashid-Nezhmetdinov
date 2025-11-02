@@ -47,6 +47,77 @@ blunder_img.src = "node_eval/images/blunder_256x.png";
 winner_img.src = "node_eval/images/winner_256x.png";
 book_img.src = "node_eval/images/book_256x.png";
 
+
+// ========================================
+// 🆕 SISTEMA DE ABERTURAS - FUNÇÕES NOVAS
+// ========================================
+
+let openings_data = {};
+let last_opening_shown = null;
+
+// Carrega o JSON de aberturas
+fetch('openings.json')
+    .then(r => r.json())
+    .then(data => {
+        openings_data = data;
+        console.log('✅ [ABERTURAS] Carregadas:', Object.keys(data).length);
+    })
+    .catch(e => console.warn('⚠️ Erro ao carregar openings.json:', e));
+
+// Busca abertura pelos lances
+function buscar_abertura(lances) {
+    if (!lances || !openings_data) return null;
+    if (openings_data[lances]) return openings_data[lances];
+    
+    let melhor = null;
+    let tamanho = 0;
+    for (let chave in openings_data) {
+        if (lances.startsWith(chave) && chave.length > tamanho) {
+            melhor = openings_data[chave];
+            tamanho = chave.length;
+        }
+    }
+    return melhor;
+}
+
+// Mostra popup de abertura
+function mostrar_popup_abertura(abertura) {
+    let velho = document.querySelector('.popup-abertura');
+    if (velho) velho.remove();
+    
+    let popup = document.createElement('div');
+    popup.className = 'popup-abertura';
+    popup.innerHTML = `
+        <div style="font-size:2em">📖</div>
+        <div style="font-size:1.3em;font-weight:bold">${abertura.name}</div>
+        <div style="background:#4caf50;color:white;padding:5px 15px;border-radius:20px;margin-top:10px">
+            ${abertura.eco || '???'}
+        </div>
+    `;
+    
+    popup.style.cssText = `
+        position: fixed; bottom: 30px; right: 30px;
+        background: linear-gradient(135deg, #2196f3, #1565c0);
+        color: white; padding: 30px; border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        z-index: 99999; text-align: center;
+        animation: entrar-abertura 0.4s;
+    `;
+    
+    document.body.appendChild(popup);
+    console.log('✅ [POPUP] Abertura:', abertura.name);
+    setTimeout(() => popup.remove(), 3000);
+}
+
+// CSS para animação
+(function() {
+    let style = document.createElement('style');
+    style.textContent = `@keyframes entrar-abertura { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`;
+    document.head.appendChild(style);
+})();
+
+// ========================================
+
 // ===================================
 // 🆕 FUNÇÃO: Calcula valor do material
 // ===================================
@@ -1400,39 +1471,50 @@ function draw_node_eval() {
 // ===================================
 
 function load_book_moves() {
-    // 🔥 FUNÇÃO DESABILITADA - NÃO FILTRAR NADA
-    // Esta função originalmente limitava as setas baseado no livro de aberturas
-    // AGORA: Apenas atualiza o nome da abertura, SEM FILTRAR SETAS
+    // === ATUALIZA O NOME DA ABERTURA ===
+    const el = document.getElementById('openingname_text');
     
-    if(hub.tree.node.parent === null) {
-        openingname_text.innerHTML = "Starting Position";
-        return;
-    }
-
-    // Apenas mostra o nome da abertura (não afeta as setas)
-    try {
-        if (config.looker_api === "lichess_masters" || config.looker_api === "lichess_plebs") {
-            let current_node = hub.tree.node;
-            let current_entry = hub.looker.lookup(config.looker_api, current_node.board);
-
-            if(current_entry !== null) {
-                while(current_entry.opening === "null" && current_node.parent !== null) {
-                    current_node = current_node.parent;
-                    current_entry = hub.looker.lookup(config.looker_api, current_node.board);
-
-                    if(current_entry === null) {
-                        break;
-                    }
+    if (el) {
+        let moveList = document.getElementById('movelist');
+        let lances = '';
+        
+        if (moveList) {
+            let texto = moveList.textContent || '';
+            lances = texto.replace(/\d+\./g, '').trim().replace(/\s+/g, ' ');
+        }
+        
+        console.log('📝 [BOOK] Lances:', lances);
+        
+        if (!lances || lances.length < 3) {
+            el.textContent = 'Starting Position';
+            el.style.color = '#fff';
+            
+            if (last_opening_shown !== 'start') {
+                last_opening_shown = 'start';
+            }
+        } else {
+            let abertura = buscar_abertura(lances);
+            
+            if (abertura) {
+                let eco = abertura.eco || '???';
+                el.innerHTML = `<span style="color:#2196f3;font-weight:bold">${abertura.name}</span> <span style="background:#4caf50;color:white;padding:2px 8px;border-radius:3px;font-size:10px;margin-left:5px">${eco}</span>`;
+                el.style.color = '#fff';
+                
+                let chave = abertura.name + eco;
+                if (last_opening_shown !== chave) {
+                    last_opening_shown = chave;
+                    mostrar_popup_abertura(abertura);
+                    console.log('✅ [BOOK] Abertura:', abertura.name);
                 }
-
-                openingname_text.innerHTML = current_entry?.opening;
+            } else {
+                el.textContent = 'Unknown Opening';
+                el.style.color = '#999';
+                last_opening_shown = null;
             }
         }
-    } catch (e) {
-        console.warn('Erro ao carregar nome da abertura:', e);
     }
 
-    // 🔥 CRÍTICO: NUNCA POPULAR O CACHE (isso limitava as setas!)
+    // 🔥 NÃO POPULAR O CACHE (para mostrar TODAS as setas)
     book_moves_cache = null;
     book_moves_cache_node_id = null;
 }

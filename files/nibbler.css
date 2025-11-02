@@ -1512,3 +1512,26 @@ span.nobr {
     box-shadow: 0 4px 15px rgba(27, 173, 166, 0.5);
     font-weight: bold;
 }
+
+/* Botões de zoom */
+#btn_zoom_out, #btn_zoom_in {
+    font-size: 24px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+#btn_zoom_out {
+    background-color: #d32f2f;
+}
+
+#btn_zoom_out:hover {
+    background-color: #f44336;
+}
+
+#btn_zoom_in {
+    background-color: #388e3c;
+}
+
+#btn_zoom_in:hover {
+    background-color: #4caf50;
+}
