@@ -1,0 +1,31 @@
+# Dependências de projeto (Node/npm/Yarn/pnpm)
+/node_modules
+/package-lock.json
+/yarn.lock
+/pnpm-lock.yaml
+
+# Compilações e Distribuições
+/dist
+/build
+/out
+/release
+/tmp
+/temp
+/logs
+
+# Arquivos específicos do Electron (se houver outros além do node_modules)
+# O electron.exe está dentro de node_modules, mas é bom ignorar outras saídas
+# /files/node_modules/electron/dist/electron.exe # Não é necessário, pois /node_modules já o ignora.
+
+# Arquivos de configurações de ambiente e secrets
+.env
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*~

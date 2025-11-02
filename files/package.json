@@ -1,0 +1,33 @@
+{
+  "name": "Nibbler",
+  "version": "2.4.0",
+  "author": "Rooklift",
+  "description": "Leela Chess Zero (Lc0) interface",
+  "license": "GPL-3.0",
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rooklift/nibbler"
+  },
+  "dependencies": {
+    "highcharts": "^10.3.3"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.example.nibbler",
+    "productName": "Nibbler",
+    "files": [
+      "**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
