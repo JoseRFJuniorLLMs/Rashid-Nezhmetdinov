@@ -15,6 +15,10 @@ var book_moves_cache_node_id = null;
 // Trava anti-pisca
 var last_popup_node_id = null;
 
+// 🆕 Controle de animação de mate
+var mate_animation_running = false;
+var mate_animation_timeout_ids = [];
+
 // 🆕 NOVAS IMAGENS PARA SACRIFÍCIOS
 var brilliant_img = new Image();
 var great_img = new Image();
@@ -68,13 +72,638 @@ function getMaterialValue(board) {
 }
 
 // ===================================
-// ✨ EFEITO AZUL COM TRILHA ANIMADA
+// 🆕 ANÁLISE POSICIONAL AVANÇADA
 // ===================================
-function applySquareEffect(fromSquare, toSquare) {
+function analyzePositionalFactors(node, parentNode) {
+    let factors = {
+        controleCentro: 0,
+        desenvolvimentoPecas: 0,
+        estruturaPeoes: 0,
+        atividadePecas: 0,
+        segurancaRei: 0,
+        linhasAbertas: 0,
+        pressaoPosicional: 0,
+        score: 0
+    };
+    
+    if (!node || !node.board || !parentNode || !parentNode.board) {
+        return factors;
+    }
+    
+    try {
+        const board = node.board;
+        const parentBoard = parentNode.board;
+        const turn = parentBoard.turn; // Quem jogou
+        
+        // 1️⃣ CONTROLE DO CENTRO (casas d4, e4, d5, e5)
+        const centroSquares = ['d4', 'e4', 'd5', 'e5'];
+        let controloAntes = 0;
+        let controloDepois = 0;
+        
+        centroSquares.forEach(square => {
+            const pecaAntes = parentBoard.piece(square);
+            const pecaDepois = board.piece(square);
+            
+            // Conta peças próprias no centro
+            if (pecaAntes && ((turn === 'w' && pecaAntes === pecaAntes.toUpperCase()) || 
+                              (turn === 'b' && pecaAntes === pecaAntes.toLowerCase()))) {
+                controloAntes++;
+            }
+            if (pecaDepois && ((turn === 'w' && pecaDepois === pecaDepois.toUpperCase()) || 
+                               (turn === 'b' && pecaDepois === pecaDepois.toLowerCase()))) {
+                controloDepois++;
+            }
+        });
+        
+        factors.controleCentro = controloDepois - controloAntes;
+        
+        // 2️⃣ DESENVOLVIMENTO (peças fora da casa inicial)
+        const desenvolvimentoAntes = countDevelopedPieces(parentBoard, turn);
+        const desenvolvimentoDepois = countDevelopedPieces(board, turn);
+        factors.desenvolvimentoPecas = desenvolvimentoDepois - desenvolvimentoAntes;
+        
+        // 3️⃣ ESTRUTURA DE PEÕES (ilhas de peões, peões duplicados, isolados)
+        factors.estruturaPeoes = analyzePawnStructure(board, turn) - analyzePawnStructure(parentBoard, turn);
+        
+        // 4️⃣ ATIVIDADE DAS PEÇAS (mobilidade)
+        const mobilidadeAntes = parentBoard.movegen().length;
+        const mobilidadeDepois = board.movegen().length;
+        factors.atividadePecas = (turn === 'w') ? (mobilidadeDepois - mobilidadeAntes) : (mobilidadeAntes - mobilidadeDepois);
+        
+        // 5️⃣ SEGURANÇA DO REI (peões na frente do rei)
+        factors.segurancaRei = analyzeKingSafety(board, turn) - analyzeKingSafety(parentBoard, turn);
+        
+        // 6️⃣ LINHAS ABERTAS (colunas sem peões)
+        factors.linhasAbertas = countOpenFiles(board, turn) - countOpenFiles(parentBoard, turn);
+        
+        // 7️⃣ PRESSÃO POSICIONAL (ataca peças valiosas, restringe oponente)
+        factors.pressaoPosicional = analyzePressure(node, parentNode, turn);
+        
+        // SCORE TOTAL PONDERADO
+        factors.score = 
+            (factors.controleCentro * 3) +
+            (factors.desenvolvimentoPecas * 2) +
+            (factors.estruturaPeoes * 2) +
+            (factors.atividadePecas * 0.5) +
+            (factors.segurancaRei * 1.5) +
+            (factors.linhasAbertas * 2) +
+            (factors.pressaoPosicional * 3);
+        
+    } catch (e) {
+        console.warn('Erro na análise posicional:', e);
+    }
+    
+    return factors;
+}
+
+// Helper: Conta peças desenvolvidas
+function countDevelopedPieces(board, color) {
+    let count = 0;
+    const pieces = (color === 'w') ? ['N', 'B', 'Q'] : ['n', 'b', 'q'];
+    const startRank = (color === 'w') ? '1' : '8';
+    
+    pieces.forEach(piece => {
+        const positions = board.find(piece);
+        positions.forEach(pos => {
+            if (!pos.includes(startRank)) {
+                count++;
+            }
+        });
+    });
+    
+    return count;
+}
+
+// Helper: Analisa estrutura de peões (penaliza isolados e duplicados)
+function analyzePawnStructure(board, color) {
+    const pawn = (color === 'w') ? 'P' : 'p';
+    const pawns = board.find(pawn);
+    
+    let fileCount = {};
+    let score = 0;
+    
+    pawns.forEach(square => {
+        const file = square[0];
+        fileCount[file] = (fileCount[file] || 0) + 1;
+    });
+    
+    // Penaliza peões duplicados (-1 por duplicata)
+    Object.values(fileCount).forEach(count => {
+        if (count > 1) score -= (count - 1);
+    });
+    
+    // Penaliza peões isolados
+    Object.keys(fileCount).forEach(file => {
+        const fileIndex = file.charCodeAt(0) - 97;
+        const leftFile = String.fromCharCode(96 + fileIndex);
+        const rightFile = String.fromCharCode(98 + fileIndex);
+        
+        if (!fileCount[leftFile] && !fileCount[rightFile]) {
+            score -= 1; // Peão isolado
+        }
+    });
+    
+    return score;
+}
+
+// Helper: Segurança do rei
+function analyzeKingSafety(board, color) {
+    const king = (color === 'w') ? 'K' : 'k';
+    const pawn = (color === 'w') ? 'P' : 'p';
+    const kingPos = board.find(king)[0];
+    
+    if (!kingPos) return 0;
+    
+    const kingFile = kingPos.charCodeAt(0) - 97;
+    const kingRank = parseInt(kingPos[1]);
+    
+    let safety = 0;
+    
+    // Verifica peões na frente do rei
+    for (let file = Math.max(0, kingFile - 1); file <= Math.min(7, kingFile + 1); file++) {
+        const checkRank = (color === 'w') ? kingRank + 1 : kingRank - 1;
+        const checkSquare = String.fromCharCode(97 + file) + checkRank;
+        
+        if (board.piece(checkSquare) === pawn) {
+            safety++;
+        }
+    }
+    
+    return safety;
+}
+
+// Helper: Conta colunas abertas (semi-abertas)
+function countOpenFiles(board, color) {
+    const pawn = (color === 'w') ? 'P' : 'p';
+    const pawns = board.find(pawn);
+    
+    let filesWithPawns = new Set();
+    pawns.forEach(square => {
+        filesWithPawns.add(square[0]);
+    });
+    
+    return 8 - filesWithPawns.size;
+}
+
+// Helper: Analisa pressão posicional
+function analyzePressure(node, parentNode, color) {
+    let pressure = 0;
+    
+    try {
+        // Verifica se ataca peças valiosas do oponente
+        const board = node.board;
+        const moves = board.movegen();
+        
+        moves.forEach(move => {
+            const targetSquare = move.slice(2, 4);
+            const targetPiece = board.piece(targetSquare);
+            
+            if (targetPiece) {
+                const isOpponentPiece = (color === 'w') ? 
+                    (targetPiece === targetPiece.toLowerCase()) : 
+                    (targetPiece === targetPiece.toUpperCase());
+                
+                if (isOpponentPiece) {
+                    // Pontos por atacar peças valiosas
+                    const valores = { 'q': 4, 'r': 3, 'b': 2, 'n': 2, 'p': 1 };
+                    pressure += valores[targetPiece.toLowerCase()] || 0;
+                }
+            }
+        });
+        
+        // Reduz mobilidade do oponente
+        const oponentMovesBefore = parentNode.board.movegen().length;
+        const oponentMovesAfter = board.movegen().length;
+        
+        if (oponentMovesAfter < oponentMovesBefore) {
+            pressure += (oponentMovesBefore - oponentMovesAfter) * 0.1;
+        }
+        
+    } catch (e) {
+        console.warn('Erro ao analisar pressão:', e);
+    }
+    
+    return pressure;
+}
+
+// ===================================
+// 🆕 DETECÇÃO DE LANCES BRILHANTES
+// ===================================
+function detectBrilliantMove(node, parentNode, eval_diff, perda_material) {
+    // Critérios para lance brilhante (não-óbvio mas muito forte)
+    
+    let isBrilliant = false;
+    let reason = '';
+    
+    try {
+        // 1️⃣ Lance perfeito em posição complexa (eval_diff = 0 mas não é óbvio)
+        if (eval_diff === 0) {
+            const alternatives = SortedMoveInfo(parentNode);
+            
+            // Se há muitas alternativas boas (posição complexa)
+            if (alternatives.length > 5) {
+                const secondBest = alternatives[1];
+                const bestEval = alternatives[0].value() * 100;
+                const secondEval = secondBest ? secondBest.value() * 100 : bestEval;
+                
+                // Lance é único melhor (margem > 0.3)
+                if (Math.abs(bestEval - secondEval) > 30) {
+                    isBrilliant = true;
+                    reason = 'ÚNICO MELHOR LANCE EM POSIÇÃO COMPLEXA';
+                }
+            }
+        }
+        
+        // 2️⃣ Lance contra-intuitivo (sacrifício posicional com compensação)
+        if (perda_material >= 1 && eval_diff <= 15) {
+            const posicional = analyzePositionalFactors(node, parentNode);
+            
+            // Compensação posicional forte
+            if (posicional.score >= 3) {
+                isBrilliant = true;
+                reason = 'SACRIFÍCIO COM COMPENSAÇÃO POSICIONAL';
+                console.log(`💎 Fatores posicionais:`, posicional);
+            }
+        }
+        
+        // 3️⃣ Lance silencioso devastador (quiet move com grande impacto)
+        const move = node.move_old_format();
+        const from = move.slice(0, 2);
+        const to = move.slice(2, 4);
+        const captured = parentNode.board.piece(to);
+        
+        if (!captured && eval_diff === 0) {
+            // Lance sem captura mas muito forte
+            const parent_info = SortedMoveInfo(parentNode);
+            const parent_eval = parent_info[0] ? parent_info[0].value() * 100 : 0;
+            const current_info = SortedMoveInfo(node);
+            const current_eval = current_info[0] ? (100 - current_info[0].value() * 100) : 0;
+            
+            const improvementTemp = current_eval - parent_eval;
+            
+            // Melhora a posição significativamente sem capturar
+            if (Math.abs(improvementTemp) > 50) {
+                isBrilliant = true;
+                reason = 'LANCE SILENCIOSO DEVASTADOR';
+            }
+        }
+        
+        // 4️⃣ Zugzwang forçado (força o oponente a piorar sua posição)
+        const oponentMoves = node.board.movegen();
+        if (oponentMoves.length <= 3 && eval_diff === 0) {
+            isBrilliant = true;
+            reason = 'ZUGZWANG - RESTRINGE OPONENTE';
+        }
+        
+    } catch (e) {
+        console.warn('Erro ao detectar lance brilhante:', e);
+    }
+    
+    return { isBrilliant, reason };
+}
+
+// ===================================
+// 🆕 DETECÇÃO DE MATE - VERSÃO COMPLETA
+// ===================================
+function detectMateSequence(node) {
+    if (!node || !node.table) return null;
+    
+    let info_list = SortedMoveInfo(node);
+    
+    if (!info_list || info_list.length === 0) return null;
+    
+    let best_move = info_list[0];
+    
+    // LC0 retorna mate como valor muito alto (geralmente > 90.00)
+    let eval_value = best_move.value() * 100;
+    
+    // Detecta mate forçado
+    if (Math.abs(eval_value) >= 85.0) {
+        let moves_to_mate = Math.max(1, Math.ceil((100 - Math.abs(eval_value)) * 2));
+        
+        if (moves_to_mate > 20) moves_to_mate = 20;
+        
+        let is_winning = eval_value > 0;
+        
+        // Extrai a sequência PV (Principal Variation)
+        let pv_string = best_move.pv || '';
+        
+        console.log(`🏁 ${is_winning ? 'MATE' : 'SENDO MATADO'} EM ~${moves_to_mate} LANCES!`);
+        console.log(`📊 Eval value: ${eval_value.toFixed(2)}`);
+        console.log(`📊 PV: ${pv_string}`);
+        
+        return {
+            isMate: true,
+            isWinning: is_winning,
+            movesToMate: moves_to_mate,
+            sequence: pv_string,
+            evalValue: eval_value
+        };
+    }
+    
+    return null;
+}
+
+// ===================================
+// 🆕 VERIFICAÇÃO DE MATE NO TABULEIRO
+// ===================================
+function checkForMateOnBoard(board) {
+    try {
+        if (board.no_moves()) {
+            if (board.king_in_check()) {
+                return { isMate: true, movesToMate: 0, immediate: true };
+            } else {
+                return { isStalemate: true };
+            }
+        }
+        
+        let moves = board.movegen();
+        for (let move of moves) {
+            let test_board = board.copy();
+            test_board.move(move);
+            
+            if (test_board.no_moves() && test_board.king_in_check()) {
+                return { 
+                    isMate: true, 
+                    movesToMate: 1, 
+                    winningMove: move,
+                    immediate: false 
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('Erro ao verificar mate:', e);
+    }
+    
+    return { isMate: false };
+}
+
+// ===================================
+// 🎬 ANIMAÇÃO DE CASCATA - SEQUÊNCIA DE MATE (MELHORADA)
+// ===================================
+function showMateSequenceAnimation(mateInfo, currentBoard) {
+    // Cancela animação anterior se existir
+    clearMateAnimation();
+    
+    if (!mateInfo) {
+        console.warn('⚠️ mateInfo é null/undefined');
+        return;
+    }
+    
+    console.log(`🎬 showMateSequenceAnimation chamada com:`, mateInfo);
+    
+    if (!mateInfo.sequence || mateInfo.sequence.length < 4) {
+        console.warn('⚠️ Sequência vazia ou inválida:', mateInfo.sequence);
+        
+        // 🆕 FALLBACK: Se não tem sequência, mostra pelo menos indicação visual
+        if (mateInfo.firstMove && mateInfo.firstMove.length >= 4) {
+            console.log(`🎬 Usando firstMove como fallback: ${mateInfo.firstMove}`);
+            const from = mateInfo.firstMove.slice(0, 2);
+            const to = mateInfo.firstMove.slice(2, 4);
+            
+            clearSquareEffects();
+            applyMateSquareEffect(from, to, true);
+            
+            // Adiciona texto explicativo
+            setTimeout(() => {
+                const hint = document.createElement('div');
+                hint.className = 'nibbler-mate-hint';
+                hint.style.cssText = `
+                    position: fixed;
+                    bottom: 120px;
+                    right: 30px;
+                    background: rgba(255, 215, 0, 0.95);
+                    color: black;
+                    padding: 15px 30px;
+                    border-radius: 10px;
+                    font-size: 1.2em;
+                    font-weight: bold;
+                    z-index: 99998;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    border: 2px solid gold;
+                `;
+                hint.textContent = `⚡ Jogue: ${mateInfo.firstMove.toUpperCase()}`;
+                document.body.appendChild(hint);
+                
+                setTimeout(() => hint.remove(), 3000);
+            }, 200);
+        }
+        
+        return;
+    }
+    
+    mate_animation_running = true;
+    
+    // Parse da sequência PV
+    let moves = parsePVString(mateInfo.sequence);
+    
+    console.log(`🎬 Moves parseados:`, moves);
+    
+    if (moves.length === 0) {
+        console.warn('⚠️ Nenhum lance parseado da sequência');
+        mate_animation_running = false;
+        return;
+    }
+    
+    // Limita a 8 lances para não sobrecarregar
+    const MAX_MOVES = 8;
+    if (moves.length > MAX_MOVES) {
+        moves = moves.slice(0, MAX_MOVES);
+        console.log(`📊 Sequência limitada a ${MAX_MOVES} lances`);
+    }
+    
+    console.log(`🎬 Iniciando animação com ${moves.length} lances:`, moves);
+    
+    // Simula o tabuleiro para cada lance
+    let board = currentBoard.copy();
+    let validMoves = [];
+    
+    for (let i = 0; i < moves.length; i++) {
+        try {
+            let move = moves[i];
+            
+            // Verifica se o lance é legal
+            if (!board.illegal(move)) {
+                validMoves.push({
+                    move: move,
+                    from: move.slice(0, 2),
+                    to: move.slice(2, 4),
+                    isLastMove: i === moves.length - 1,
+                    moveNumber: i + 1
+                });
+                
+                board.move(move);
+                console.log(`✅ Lance ${i + 1}/${moves.length} validado: ${move}`);
+            } else {
+                console.warn(`⚠️ Lance ilegal: ${move}`);
+                break;
+            }
+        } catch (e) {
+            console.warn(`⚠️ Erro ao processar lance ${moves[i]}:`, e);
+            break;
+        }
+    }
+    
+    if (validMoves.length === 0) {
+        console.warn('⚠️ Nenhum lance válido na sequência');
+        mate_animation_running = false;
+        return;
+    }
+    
+    console.log(`✅ ${validMoves.length} lances válidos para animar`);
+    
+    // Anima cada lance com delay
+    const DELAY_PER_MOVE = 700; // ms (aumentado para melhor visualização)
+    
+    validMoves.forEach((moveData, index) => {
+        let timeoutId = setTimeout(() => {
+            console.log(`🎬 Animando lance ${moveData.moveNumber}/${validMoves.length}: ${moveData.move}`);
+            
+            // Remove efeitos anteriores
+            clearSquareEffects();
+            
+            // Aplica efeito visual
+            if (moveData.isLastMove) {
+                // Lance final = DOURADO piscante
+                applyMateSquareEffect(moveData.from, moveData.to, true);
+                console.log(`👑 LANCE FINAL DE MATE: ${moveData.move}`);
+                
+                // Mensagem adicional no último lance
+                setTimeout(() => {
+                    const finalMsg = document.createElement('div');
+                    finalMsg.className = 'nibbler-mate-final-message';
+                    finalMsg.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: linear-gradient(135deg, rgba(255, 215, 0, 0.98), rgba(255, 140, 0, 0.98));
+                        color: black;
+                        padding: 40px 80px;
+                        border-radius: 20px;
+                        font-size: 3em;
+                        font-weight: bold;
+                        z-index: 100000;
+                        box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+                        border: 5px solid gold;
+                        animation: pulse-scale 1s ease-in-out infinite;
+                    `;
+                    finalMsg.innerHTML = `👑 CHECKMATE! 👑`;
+                    document.body.appendChild(finalMsg);
+                    
+                    setTimeout(() => finalMsg.remove(), 2500);
+                }, 500);
+            } else {
+                // Lances intermediários = CYAN
+                applyMateSquareEffect(moveData.from, moveData.to, false);
+            }
+            
+            // Se é o último lance, finaliza animação
+            if (index === validMoves.length - 1) {
+                setTimeout(() => {
+                    mate_animation_running = false;
+                    console.log('🎬 Animação de mate finalizada');
+                }, 2500);
+            }
+            
+        }, index * DELAY_PER_MOVE);
+        
+        mate_animation_timeout_ids.push(timeoutId);
+    });
+}
+
+// ===================================
+// 🎨 EFEITO VISUAL PARA SEQUÊNCIA DE MATE
+// ===================================
+function applyMateSquareEffect(fromSquare, toSquare, isFinalMove) {
+    if (!fromSquare || !toSquare) return;
+    
+    const from = fromSquare.toLowerCase();
+    const to = toSquare.toLowerCase();
+    
+    const fromCell = findSquareElement(from);
+    const toCell = findSquareElement(to);
+    
+    if (isFinalMove) {
+        // Lance final = DOURADO com pulso
+        if (fromCell) {
+            fromCell.classList.add('nibbler-mate-final-origin');
+        }
+        if (toCell) {
+            toCell.classList.add('nibbler-mate-final-destination');
+        }
+    } else {
+        // Lances intermediários = CYAN
+        if (fromCell) {
+            fromCell.classList.add('nibbler-mate-origin');
+        }
+        if (toCell) {
+            toCell.classList.add('nibbler-mate-destination');
+        }
+    }
+}
+
+// ===================================
+// 🧹 LIMPA EFEITOS VISUAIS
+// ===================================
+function clearSquareEffects() {
     const allSquares = document.querySelectorAll('#boardfriends td');
     allSquares.forEach(cell => {
-        cell.classList.remove('nibbler-move-origin', 'nibbler-move-destination', 'nibbler-move-trail');
+        cell.classList.remove(
+            'nibbler-move-origin',
+            'nibbler-move-destination',
+            'nibbler-move-trail',
+            'nibbler-mate-origin',
+            'nibbler-mate-destination',
+            'nibbler-mate-final-origin',
+            'nibbler-mate-final-destination'
+        );
     });
+}
+
+function clearMateAnimation() {
+    // Cancela todos os timeouts pendentes
+    mate_animation_timeout_ids.forEach(id => clearTimeout(id));
+    mate_animation_timeout_ids = [];
+    mate_animation_running = false;
+    clearSquareEffects();
+}
+
+// ===================================
+// 🔍 PARSE DA STRING PV (Principal Variation)
+// ===================================
+function parsePVString(pvString) {
+    if (!pvString || typeof pvString !== 'string') return [];
+    
+    // Remove espaços extras e quebras de linha
+    pvString = pvString.trim();
+    
+    // Separa por espaços
+    let tokens = pvString.split(/\s+/);
+    
+    let moves = [];
+    
+    for (let token of tokens) {
+        // Remove número de lances (ex: "1.", "2.")
+        token = token.replace(/^\d+\./, '').trim();
+        
+        // Ignora tokens vazios ou inválidos
+        if (token.length < 4) continue;
+        
+        // Formato esperado: e2e4, g1f3, etc
+        if (/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(token)) {
+            moves.push(token);
+        }
+    }
+    
+    return moves;
+}
+
+// ===================================
+// ✨ EFEITO AZUL COM TRILHA ANIMADA (ORIGINAL)
+// ===================================
+function applySquareEffect(fromSquare, toSquare) {
+    clearSquareEffects();
 
     if (!fromSquare || !toSquare) return;
 
@@ -151,18 +780,17 @@ function findSquareElement(square) {
 // ===================================
 // 🆕 POPUP DE QUALIDADE - 🎯 CANTO INFERIOR DIREITO
 // ===================================
-function showMoveQualityPopup(qualityType) {
+function showMoveQualityPopup(qualityType, mateInfo = null) {
     const oldPopup = document.querySelector('.nibbler-quality-popup');
     if (oldPopup) oldPopup.remove();
 
-    let quality = getMoveQualityByType(qualityType);
+    let quality = getMoveQualityByType(qualityType, mateInfo);
     if (!quality) return;
 
     const popup = document.createElement('div');
     popup.className = 'nibbler-quality-popup';
     popup.style.borderColor = quality.color;
     
-    // 🎯 POSIÇÃO FIXA NO CANTO INFERIOR DIREITO
     popup.style.position = 'fixed';
     popup.style.bottom = '30px';
     popup.style.right = '30px';
@@ -172,8 +800,7 @@ function showMoveQualityPopup(qualityType) {
     popup.style.left = 'auto';
     popup.style.top = 'auto';
 
-    // Estilo especial para sacrifícios épicos
-    if (qualityType === 'SACRIFICE_QUEEN' || qualityType === 'SACRIFICE_ROOK') {
+    if (qualityType === 'MATE' || qualityType === 'SACRIFICE_QUEEN' || qualityType === 'SACRIFICE_ROOK') {
         popup.style.background = 'linear-gradient(135deg, rgba(0,0,0,0.98) 0%, rgba(20,0,0,0.98) 100%)';
         popup.style.padding = '35px 70px';
         popup.style.fontSize = '2.2em';
@@ -188,12 +815,29 @@ function showMoveQualityPopup(qualityType) {
 
     document.body.appendChild(popup);
 
-    const duration = (qualityType === 'SACRIFICE_QUEEN' || qualityType === 'SACRIFICE_ROOK') ? 2400 : 1600;
+    const duration = (qualityType === 'MATE' || qualityType === 'SACRIFICE_QUEEN' || qualityType === 'SACRIFICE_ROOK') ? 3000 : 1600;
     setTimeout(() => popup.remove(), duration);
 }
 
-function getMoveQualityByType(type) {
-    // Se for string (tipo especial)
+function getMoveQualityByType(type, mateInfo = null) {
+    if (type === 'MATE' && mateInfo) {
+        if (mateInfo.isWinning) {
+            return {
+                icon: '♔👑',
+                color: '#FFD700',
+                text: `🏁 XEQUE-MATE EM ${mateInfo.movesToMate}! 🏁`,
+                emoji: '👑'
+            };
+        } else {
+            return {
+                icon: '⚠️♚',
+                color: '#FF1744',
+                text: `⚠️ SENDO MATADO EM ${mateInfo.movesToMate}! ⚠️`,
+                emoji: '💀'
+            };
+        }
+    }
+    
     if (typeof type === 'string') {
         const specialQualities = {
             'SACRIFICE_QUEEN': {
@@ -230,7 +874,6 @@ function getMoveQualityByType(type) {
         return specialQualities[type];
     }
 
-    // Se for número (eval_diff normal)
     if (type === 0) return { icon: '✔', color: '#96BC4B', text: 'MELHOR LANCE' };
     if (type <= 2) return { icon: '⚡', color: '#96BC4B', text: 'EXCELENTE' };
     if (type <= 5) return { icon: '▽', color: '#96AF8B', text: 'BOM LANCE' };
@@ -239,7 +882,6 @@ function getMoveQualityByType(type) {
     return { icon: '✕', color: '#CA3431', text: 'ERRO GRAVE' };
 }
 
-// 🆕 Versão antiga mantida para compatibilidade
 function getMoveQuality(evalDiff) {
     return getMoveQualityByType(evalDiff);
 }
@@ -254,6 +896,7 @@ function node_eval_changed() {
 
     if (!config.is_eval_enabled || eval_node === null) {
         is_eval_visible = false;
+        clearMateAnimation();
         return;
     }
 
@@ -265,6 +908,7 @@ function node_eval_changed() {
 
     if (eval_node.move === null) {
         is_eval_visible = false;
+        clearMateAnimation();
         return;
     }
 
@@ -303,10 +947,7 @@ function node_eval_changed() {
 }
 
 // ===================================
-// 🆕 DRAW_NODE_EVAL - COM DETECÇÃO CORRIGIDA
-// ===================================
-// ===================================
-// 🆕 DRAW_NODE_EVAL - COM DETECÇÃO CORRIGIDA
+// 🆕 DRAW_NODE_EVAL - COM ANIMAÇÃO DE MATE
 // ===================================
 function draw_node_eval() {
     if (!is_eval_visible) {
@@ -338,11 +979,130 @@ function draw_node_eval() {
         eval_node.eval_diff = eval_diff;
     }
 
-    // Checkmate
-    if (eval_node.board.no_moves() && eval_node.board.king_in_check()) {
+    // ===================================
+    // 🆕 VERIFICAÇÃO DE MATE COM ANIMAÇÃO
+    // ===================================
+    
+    let board_mate = checkForMateOnBoard(eval_node.board);
+    let mate_info = detectMateSequence(eval_node);
+    
+    // 🆕 MATE DETECTADO - SEMPRE MOSTRA ANIMAÇÃO
+    if (mate_info && mate_info.isMate) {
         eval_icon = winner_img;
         eval_diff = 0;
-    } else if (!(hub.engine.search_running.node && hub.engine.search_running === hub.engine.search_desired)
+        
+        if (eval_node.id !== last_popup_node_id) {
+            showMoveQualityPopup('MATE', mate_info);
+            
+            console.log(`🎬 ========== INICIANDO ANIMAÇÃO DE MATE ==========`);
+            console.log(`🎬 Mate info:`, mate_info);
+            console.log(`🎬 Sequência: "${mate_info.sequence}"`);
+            console.log(`🎬 Primeiro lance: "${mate_info.firstMove}"`);
+            
+            // 🎬 SEMPRE INICIA ANIMAÇÃO (mesmo se PV estiver vazia)
+            if (mate_info.sequence && mate_info.sequence.length >= 4) {
+                // Tem sequência completa
+                console.log(`✅ Iniciando animação com sequência completa`);
+                setTimeout(() => {
+                    showMateSequenceAnimation(mate_info, eval_node.board);
+                }, 500);
+            } else if (mate_info.firstMove && mate_info.firstMove.length >= 4) {
+                // Tem pelo menos o primeiro lance
+                console.log(`✅ Iniciando animação só com primeiro lance`);
+                mate_info.sequence = mate_info.firstMove;
+                setTimeout(() => {
+                    showMateSequenceAnimation(mate_info, eval_node.board);
+                }, 500);
+            } else {
+                console.warn(`⚠️ Sem sequência para animar, mostrando lance atual`);
+                // Mostra pelo menos o lance atual em dourado
+                try {
+                    const currentMove = eval_node.move_old_format();
+                    const from = currentMove.slice(0, 2);
+                    const to = currentMove.slice(2, 4);
+                    
+                    setTimeout(() => {
+                        clearSquareEffects();
+                        applyMateSquareEffect(from, to, true);
+                    }, 500);
+                } catch (e) {
+                    console.warn('Erro ao mostrar lance atual:', e);
+                }
+            }
+            
+            last_popup_node_id = eval_node.id;
+        }
+    }
+    // MATE EM 1 DETECTADO NO TABULEIRO
+    else if (board_mate.isMate && board_mate.movesToMate === 1) {
+        eval_icon = winner_img;
+        eval_diff = 0;
+        
+        if (eval_node.id !== last_popup_node_id) {
+            console.log(`🏁 Mate em 1 detectado: ${board_mate.winningMove}`);
+            
+            showMoveQualityPopup('MATE', { 
+                isMate: true, 
+                isWinning: true, 
+                movesToMate: 1,
+                sequence: board_mate.sequence || board_mate.winningMove,
+                firstMove: board_mate.winningMove
+            });
+            
+            // 🎬 ANIMA O LANCE VENCEDOR
+            if (board_mate.winningMove && board_mate.winningMove.length >= 4) {
+                const from = board_mate.winningMove.slice(0, 2);
+                const to = board_mate.winningMove.slice(2, 4);
+                
+                console.log(`🎬 Animando mate em 1: ${from} → ${to}`);
+                
+                setTimeout(() => {
+                    clearSquareEffects();
+                    applyMateSquareEffect(from, to, true);
+                }, 500);
+            }
+            
+            last_popup_node_id = eval_node.id;
+        }
+    }
+    // MATE IMEDIATO (já está em mate)
+    else if (board_mate.isMate && board_mate.immediate) {
+        eval_icon = winner_img;
+        eval_diff = 0;
+        
+        if (eval_node.id !== last_popup_node_id) {
+            showMoveQualityPopup('MATE', { 
+                isMate: true, 
+                isWinning: true, 
+                movesToMate: 0 
+            });
+            
+            // Destaca o lance que deu mate (lance atual)
+            try {
+                const currentMove = eval_node.move_old_format();
+                const from = currentMove.slice(0, 2);
+                const to = currentMove.slice(2, 4);
+                
+                console.log(`👑 Destacando lance de mate: ${from} → ${to}`);
+                
+                setTimeout(() => {
+                    clearSquareEffects();
+                    applyMateSquareEffect(from, to, true);
+                }, 500);
+            } catch (e) {
+                console.warn('Erro ao destacar mate:', e);
+            }
+            
+            last_popup_node_id = eval_node.id;
+        }
+    }
+    // CHECKMATE NORMAL
+    else if (eval_node.board.no_moves() && eval_node.board.king_in_check()) {
+        eval_icon = winner_img;
+        eval_diff = 0;
+    }
+    // VERIFICA SE ENGINE AINDA ESTÁ CALCULANDO
+    else if (!(hub.engine.search_running.node && hub.engine.search_running === hub.engine.search_desired)
         && !(hub.engine.search_running !== hub.engine.search_desired)) {
         if (eval_node.table.nodes === 0) {
             eval_icon = null;
@@ -351,20 +1111,15 @@ function draw_node_eval() {
     }
 
     // ===================================
-    // 🆕 LÓGICA DE DETECÇÃO DE SACRIFÍCIO CORRIGIDA
+    // LÓGICA DE DETECÇÃO DE SACRIFÍCIO
     // ===================================
     try {
         const move = eval_node.move_old_format();
         const from = move.slice(0, 2);
         const to = move.slice(2, 4);
         
-        // Detecta qual peça foi movida E qual foi capturada
         const peca_movida = eval_node.parent.board.piece(from);
         const peca_capturada = eval_node.parent.board.piece(to);
-        
-        console.log(`📊 🔍 DEBUG INICIAL:`);
-        console.log(`📊 from="${from}", to="${to}"`);
-        console.log(`📊 peca_movida="${peca_movida}", peca_capturada="${peca_capturada}"`);
         
         const valores = {
             'p': 1, 'P': 1,
@@ -378,59 +1133,27 @@ function draw_node_eval() {
         const valor_peca_movida = valores[peca_movida] || 0;
         const valor_peca_capturada = valores[peca_capturada] || 0;
         
-        // CÁLCULO DIRETO: quanto "perdeu" no lance
-        const sacrificio_liquido = valor_peca_movida - valor_peca_capturada;
-        
-        console.log(`📊 valor_peca_movida=${valor_peca_movida}`);
-        console.log(`📊 valor_peca_capturada=${valor_peca_capturada}`);
-        console.log(`📊 sacrificio_liquido=${sacrificio_liquido}`);
-        
-        // Calcula material total do tabuleiro
         let material_antes = getMaterialValue(eval_node.parent.board);
         let material_depois = getMaterialValue(eval_node.board);
         
         let cor_que_jogou = eval_node.board.turn === 'w' ? 'b' : 'w';
         
-        // Mudança de placar (quanto melhorou a posição)
         let mudanca_placar = parent_eval - current_eval;
         if (cor_que_jogou === 'b') {
             mudanca_placar *= -1;
         }
         
-        // Calcula perda material REAL
         let mudanca_material_bruto = material_depois - material_antes;
         if (cor_que_jogou === 'b') {
             mudanca_material_bruto *= -1;
         }
         
-        // Se perdeu material após o lance = sacrifício (valor NEGATIVO significa perda!)
         let perda_material = mudanca_material_bruto < 0 ? Math.abs(mudanca_material_bruto) : 0;
-        
-        // 📊 DEBUG COMPLETO
-        console.log(`📊 ========== LANCE #${eval_node.depth} ==========`);
-        console.log(`📊 Lance: ${move}`);
-        console.log(`📊 Peça movida: ${peca_movida} (valor: ${valor_peca_movida})`);
-        console.log(`📊 Peça capturada: ${peca_capturada || 'nenhuma'} (valor: ${valor_peca_capturada})`);
-        console.log(`📊 Material antes: ${material_antes}`);
-        console.log(`📊 Material depois: ${material_depois}`);
-        console.log(`📊 Mudança material bruto: ${mudanca_material_bruto}`);
-        console.log(`📊 Perda material: ${perda_material}`);
-        console.log(`📊 Parent eval: ${parent_eval.toFixed(2)}, Current eval: ${current_eval.toFixed(2)}`);
-        console.log(`📊 Mudança placar: ${mudanca_placar.toFixed(2)}`);
-        console.log(`📊 Eval diff: ${eval_diff}`);
-        console.log(`📊 Cor que jogou: ${cor_que_jogou}`);
-        console.log(`📊 🔍 TESTE SACRIFÍCIO DAMA: perda=${perda_material} >= 6? mudanca=${mudanca_placar.toFixed(2)} >= 20?`);
-        console.log(`📊 🔍 TESTE SACRIFÍCIO TORRE: perda=${perda_material} >= 2 e < 6? mudanca=${mudanca_placar.toFixed(2)} >= 10?`);
-        // MOSTRA POPUP (com lógica anti-pisca)
-        if (eval_node.id !== last_popup_node_id && eval_node.depth > 0) {
+
+        if (eval_node.id !== last_popup_node_id && eval_node.depth > 0 && !board_mate.isMate && !mate_info?.isMate) {
             
             let tipo_detectado = null;
             let eh_sacrificio = false;
-            
-            // ===================================
-            // 🎭 CLASSIFICAÇÃO CORRETA DE SACRIFÍCIOS
-            // Baseado na teoria de xadrez real
-            // ===================================
             
             console.log(`📊 ========================================`);
             console.log(`📊 🔍 Análise do lance #${eval_node.depth}`);
@@ -443,11 +1166,34 @@ function draw_node_eval() {
             console.log(`📊 ========================================`);
             
             // ===================================
-            // 1️⃣ PSEUDO-SACRIFÍCIO (Combinação)
-            // Material recuperado imediatamente
+            // 🆕 DETECÇÃO DE LANCE BRILHANTE
             // ===================================
-            if (perda_material >= 1 && eval_diff === 0) {
-                // Se perdeu material MAS é o melhor lance = vai recuperar à força!
+            const brilliantCheck = detectBrilliantMove(eval_node, eval_node.parent, eval_diff, perda_material);
+            
+            if (brilliantCheck.isBrilliant) {
+                tipo_detectado = 'BRILLIANT';
+                eh_sacrificio = true;
+                console.log(`💎 ✨ LANCE BRILHANTE DETECTADO: ${brilliantCheck.reason}`);
+            }
+            
+            // ===================================
+            // 🆕 ANÁLISE POSICIONAL DETALHADA
+            // ===================================
+            const posicional = analyzePositionalFactors(eval_node, eval_node.parent);
+            console.log(`📊 🎯 ANÁLISE POSICIONAL:`);
+            console.log(`📊   - Controle Centro: ${posicional.controleCentro > 0 ? '+' : ''}${posicional.controleCentro}`);
+            console.log(`📊   - Desenvolvimento: ${posicional.desenvolvimentoPecas > 0 ? '+' : ''}${posicional.desenvolvimentoPecas}`);
+            console.log(`📊   - Estrutura Peões: ${posicional.estruturaPeoes > 0 ? '+' : ''}${posicional.estruturaPeoes}`);
+            console.log(`📊   - Atividade Peças: ${posicional.atividadePecas > 0 ? '+' : ''}${posicional.atividadePecas.toFixed(1)}`);
+            console.log(`📊   - Segurança Rei: ${posicional.segurancaRei > 0 ? '+' : ''}${posicional.segurancaRei}`);
+            console.log(`📊   - Linhas Abertas: ${posicional.linhasAbertas > 0 ? '+' : ''}${posicional.linhasAbertas}`);
+            console.log(`📊   - Pressão: ${posicional.pressaoPosicional > 0 ? '+' : ''}${posicional.pressaoPosicional.toFixed(1)}`);
+            console.log(`📊   - SCORE TOTAL: ${posicional.score.toFixed(1)}`);
+            
+            // ===================================
+            // 1️⃣ PSEUDO-SACRIFÍCIO (Combinação)
+            // ===================================
+            if (!eh_sacrificio && perda_material >= 1 && eval_diff === 0) {
                 if (valor_peca_movida >= 9) {
                     tipo_detectado = 'SACRIFICE_QUEEN';
                     eh_sacrificio = true;
@@ -472,9 +1218,8 @@ function draw_node_eval() {
             
             // ===================================
             // 2️⃣ SACRIFÍCIO TÁTICO/COMBINATÓRIO
-            // Perda material pequena (eval_diff ≤ 20) = vitória forçada próxima
             // ===================================
-            else if (perda_material >= 1 && eval_diff <= 20 && mudanca_placar > 0) {
+            else if (!eh_sacrificio && perda_material >= 1 && eval_diff <= 20 && mudanca_placar > 0) {
                 if (valor_peca_movida >= 9) {
                     tipo_detectado = 'SACRIFICE_QUEEN';
                     eh_sacrificio = true;
@@ -498,37 +1243,39 @@ function draw_node_eval() {
             }
             
             // ===================================
-            // 3️⃣ SACRIFÍCIO POSICIONAL/ESTRATÉGICO (AGORA INCLUI ESPECULATIVO)
-            // Perda moderada (eval_diff ≤ 100) = compensação de longo prazo
-            // MUDANÇA APLICADA AQUI: eval_diff <= 100
+            // 3️⃣ SACRIFÍCIO POSICIONAL (NOVO - MAIS SENSÍVEL)
             // ===================================
-            else if (perda_material >= 1 && eval_diff <= 100) {
-                // Sacrifício de Qualidade (Torre por Bispo/Cavalo)
+            else if (!eh_sacrificio && perda_material >= 1 && eval_diff <= 100 && posicional.score >= 2) {
+                // Sacrifício de Qualidade com compensação posicional
                 if (valor_peca_movida === 5 && valor_peca_capturada === 3) {
                     tipo_detectado = 'GREAT_SACRIFICE';
                     eh_sacrificio = true;
-                    console.log(`📊 ✅ ⭐ SACRIFÍCIO DE QUALIDADE! (Torre por peça menor)`);
+                    console.log(`📊 ✅ ⭐ SACRIFÍCIO DE QUALIDADE POSICIONAL! (Torre por peça menor)`);
+                    console.log(`📊    Compensação: ${posicional.score.toFixed(1)} pontos posicionais`);
                 }
                 // Dama sacrificada posicionalmente
-                else if (valor_peca_movida >= 9) {
+                else if (valor_peca_movida >= 9 && posicional.score >= 4) {
                     tipo_detectado = 'SACRIFICE_QUEEN';
                     eh_sacrificio = true;
                     console.log(`📊 ✅ 👑 SACRIFÍCIO POSICIONAL DE DAMA! (Estilo Nezhmetdinov)`);
+                    console.log(`📊    Compensação excepcional: ${posicional.score.toFixed(1)}`);
                 }
                 // Torre sacrificada posicionalmente
-                else if (valor_peca_movida >= 5) {
+                else if (valor_peca_movida >= 5 && posicional.score >= 3) {
                     tipo_detectado = 'SACRIFICE_ROOK';
                     eh_sacrificio = true;
                     console.log(`📊 ✅ 🏰 SACRIFÍCIO POSICIONAL DE TORRE!`);
+                    console.log(`📊    Compensação: ${posicional.score.toFixed(1)} pontos`);
                 }
                 // Peça menor por compensação posicional
                 else if (valor_peca_movida >= 3) {
                     tipo_detectado = 'GREAT_SACRIFICE';
                     eh_sacrificio = true;
                     console.log(`📊 ✅ ⭐ SACRIFÍCIO POSICIONAL! (Compensação de longo prazo)`);
+                    console.log(`📊    Fatores: Centro=${posicional.controleCentro}, Pressão=${posicional.pressaoPosicional.toFixed(1)}`);
                 }
                 // Gambitos posicionais
-                else if (eval_node.depth <= 15) {
+                else if (eval_node.depth <= 15 && posicional.score >= 2) {
                     tipo_detectado = 'GOOD_SACRIFICE';
                     eh_sacrificio = true;
                     console.log(`📊 ✅ ⚡ GAMBITO POSICIONAL! (Controle, desenvolvimento)`);
@@ -536,32 +1283,38 @@ function draw_node_eval() {
             }
             
             // ===================================
-            // 4️⃣ SACRIFÍCIO ESPECULATIVO/INTUITIVO (REMOVIDO E INTEGRADO NO BLOCO 3)
-            // Perda maior (eval_diff ≤ 100) = "À la Tal"
+            // 4️⃣ SACRIFÍCIO NORMAL (sem compensação clara)
             // ===================================
-            // **Este bloco foi removido, pois suas condições foram absorvidas pelo bloco 3**
-            /*
-            else if (perda_material >= 3 && eval_diff <= 100) {
-                if (valor_peca_movida >= 9) {
+            else if (!eh_sacrificio && perda_material >= 1 && eval_diff <= 100) {
+                if (valor_peca_movida === 5 && valor_peca_capturada === 3) {
+                    tipo_detectado = 'GREAT_SACRIFICE';
+                    eh_sacrificio = true;
+                    console.log(`📊 ✅ ⭐ SACRIFÍCIO DE QUALIDADE!`);
+                }
+                else if (valor_peca_movida >= 9) {
                     tipo_detectado = 'SACRIFICE_QUEEN';
                     eh_sacrificio = true;
-                    console.log(`📊 ✅ 👑 SACRIFÍCIO ESPECULATIVO DE DAMA! (Estilo Mikhail Tal)`);
+                    console.log(`📊 ✅ 👑 SACRIFÍCIO DE DAMA!`);
                 }
                 else if (valor_peca_movida >= 5) {
                     tipo_detectado = 'SACRIFICE_ROOK';
                     eh_sacrificio = true;
-                    console.log(`📊 ✅ 🏰 SACRIFÍCIO ESPECULATIVO DE TORRE! (Ataque intuitivo)`);
+                    console.log(`📊 ✅ 🏰 SACRIFÍCIO DE TORRE!`);
                 }
-                else {
-                    tipo_detectado = 'BRILLIANT';
+                else if (valor_peca_movida >= 3) {
+                    tipo_detectado = 'GREAT_SACRIFICE';
                     eh_sacrificio = true;
-                    console.log(`📊 ✅ 💎 SACRIFÍCIO ESPECULATIVO! (Jogada psicológica)`);
+                    console.log(`📊 ✅ ⭐ SACRIFÍCIO!`);
+                }
+                else if (eval_node.depth <= 15) {
+                    tipo_detectado = 'GOOD_SACRIFICE';
+                    eh_sacrificio = true;
+                    console.log(`📊 ✅ ⚡ GAMBITO!`);
                 }
             }
-            */
             
             // ===================================
-            // 🎨 SE É SACRIFÍCIO, MOSTRA POPUP ÉPICO
+            // 🎨 EXIBE RESULTADO
             // ===================================
             if (eh_sacrificio) {
                 showMoveQualityPopup(tipo_detectado);
@@ -575,36 +1328,27 @@ function draw_node_eval() {
                 console.log(`📊 🔥 POPUP EXIBIDO: ${tipo_detectado}`);
             }
             
-            // ===================================
-            // 📊 SE NÃO É SACRIFÍCIO, USA LÓGICA NORMAL
-            // ===================================
             else {
                 console.log(`📊 ℹ️ Lance normal (sem sacrifício detectado)`);
                 showMoveQualityPopup(eval_diff);
                 
                 if (eval_diff === 0) { 
                     eval_icon = best_img;
-                    console.log(`📊 ✅ Melhor lance`);
                 }
                 else if (eval_diff <= 2) { 
                     eval_icon = excellent_img;
-                    console.log(`📊 ✅ Excelente`);
                 }
                 else if (eval_diff <= 5) { 
                     eval_icon = good_img;
-                    console.log(`📊 ✅ Bom`);
                 }
                 else if (eval_diff <= 10) { 
                     eval_icon = inaccuracy_img;
-                    console.log(`📊 ⚠️ Imprecisão`);
                 }
                 else if (eval_diff <= 20) { 
                     eval_icon = mistake_img;
-                    console.log(`📊 ⚠️ Erro`);
                 }
                 else { 
                     eval_icon = blunder_img;
-                    console.log(`📊 ❌ Erro grave`);
                 }
             }
             
@@ -614,7 +1358,6 @@ function draw_node_eval() {
     } catch (e) {
         console.warn('❌ Erro na detecção de sacrifício:', e);
         
-        // Fallback para lógica antiga
         if (eval_node.id !== last_popup_node_id && eval_node.depth > 0) {
             showMoveQualityPopup(eval_diff);
             last_popup_node_id = eval_node.id;
@@ -661,7 +1404,7 @@ function draw_node_eval() {
 }
 
 // ===================================
-// FUNÇÕES AUXILIARES (mantidas)
+// FUNÇÕES AUXILIARES
 // ===================================
 
 function load_book_moves() {
@@ -846,3 +1589,79 @@ function update_score() {
         }
     } catch (e) { }
 }
+
+// ===================================
+// 🎨 ESTILOS CSS PARA ANIMAÇÃO DE MATE
+// ===================================
+(function injectMateStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        /* Lances intermediários da sequência de mate - CYAN */
+        .nibbler-mate-origin {
+            background-color: rgba(0, 255, 255, 0.5) !important;
+            box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.8);
+            animation: pulse-cyan 1s ease-in-out;
+        }
+        
+        .nibbler-mate-destination {
+            background-color: rgba(0, 200, 255, 0.6) !important;
+            box-shadow: inset 0 0 25px rgba(0, 200, 255, 0.9);
+            animation: pulse-cyan 1s ease-in-out;
+        }
+        
+        /* Lance FINAL de mate - DOURADO piscante */
+        .nibbler-mate-final-origin {
+            background-color: rgba(255, 215, 0, 0.7) !important;
+            box-shadow: inset 0 0 30px rgba(255, 215, 0, 1), 0 0 20px rgba(255, 215, 0, 0.8);
+            animation: pulse-gold 1.5s ease-in-out infinite;
+        }
+        
+        .nibbler-mate-final-destination {
+            background-color: rgba(255, 180, 0, 0.8) !important;
+            box-shadow: inset 0 0 40px rgba(255, 215, 0, 1), 0 0 30px rgba(255, 215, 0, 0.9);
+            animation: pulse-gold-intense 1.5s ease-in-out infinite;
+            border: 3px solid gold !important;
+        }
+        
+        @keyframes pulse-cyan {
+            0%, 100% {
+                box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.8);
+            }
+            50% {
+                box-shadow: inset 0 0 35px rgba(0, 255, 255, 1);
+            }
+        }
+        
+        @keyframes pulse-gold {
+            0%, 100% {
+                box-shadow: inset 0 0 30px rgba(255, 215, 0, 1), 0 0 20px rgba(255, 215, 0, 0.8);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: inset 0 0 50px rgba(255, 215, 0, 1), 0 0 40px rgba(255, 215, 0, 1);
+                transform: scale(1.05);
+            }
+        }
+        
+        @keyframes pulse-gold-intense {
+            0%, 100% {
+                box-shadow: inset 0 0 40px rgba(255, 215, 0, 1), 0 0 30px rgba(255, 215, 0, 0.9);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: inset 0 0 60px rgba(255, 255, 0, 1), 0 0 50px rgba(255, 215, 0, 1);
+                transform: scale(1.08);
+            }
+        }
+        
+        @keyframes pulse-scale {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+})();
