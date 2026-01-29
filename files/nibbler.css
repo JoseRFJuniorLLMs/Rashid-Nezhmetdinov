@@ -40,7 +40,7 @@ body {
 }
 
 :root {
-	--rightgridder-width: 970px;  /*+250*/
+	--rightgridder-width: 1250px;
 	--rightgridder-inner-width: 950px;
 	--cpieces-scale: 1.5;
 }
@@ -56,12 +56,12 @@ body {
 	display: grid;
 	/*margin: 1em 0 0 0;*/
 	height: 0px;							/* js needs to keep this equal to the boardsize */
-	grid-template-columns: var(--rightgridder-width);
+	grid-template-columns: var(--rightgridder-inner-width) 280px;
 	grid-template-rows: min-content 1fr min-content;
 	grid-template-areas:
-		"j"
-		"l"
-		"i";
+		"j pgn"
+		"l pgn"
+		"i i";
 	z-index: 0;
 }
 
@@ -1537,107 +1537,87 @@ span.nobr {
 }
 
 /* =====================================================
-   PGN BROWSER PANEL
+   PGN PANEL - PAINEL DE PARTIDAS
    ===================================================== */
 
-#pgn_browser {
-    background: #2a2a2a;
-    border-radius: 8px;
-    margin: 10px 0;
-    padding: 10px;
-    max-height: 300px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-#pgn_browser_title {
-    font-size: 14px;
-    font-weight: bold;
-    color: #fff;
+#pgn_panel {
+    grid-area: pgn;
+    background: #262421;
+    border-left: 1px solid #3a3735;
     padding: 8px;
-    background: linear-gradient(135deg, #4a90d9, #357abd);
-    border-radius: 6px;
-    margin-bottom: 8px;
-    text-align: center;
-}
-
-#pgn_file_list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    overflow: hidden;
+    pointer-events: auto;
+}
+
+#pgn_header {
     margin-bottom: 8px;
 }
 
-.pgn_file_item {
-    padding: 8px 12px;
-    background: #3a3a3a;
+#pgn_file_select {
+    width: 100%;
+    padding: 8px 10px;
+    background: #3a3735;
+    border: 1px solid #4a4745;
     border-radius: 4px;
-    cursor: pointer;
-    color: #ddd;
+    color: #e0e0e0;
     font-size: 13px;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    cursor: pointer;
+    outline: none;
 }
 
-.pgn_file_item:hover {
-    background: #4a4a4a;
-    color: #fff;
+#pgn_file_select:hover {
+    border-color: #5a5755;
 }
 
-.pgn_file_item.active {
-    background: #4a90d9;
-    color: #fff;
+#pgn_file_select:focus {
+    border-color: #769656;
 }
 
-.pgn_file_icon {
-    font-size: 16px;
-}
-
-#pgn_game_list {
+#pgn_games {
     flex: 1;
     overflow-y: auto;
-    background: #1a1a1a;
+    background: #1e1c1a;
     border-radius: 4px;
-    padding: 4px;
-    max-height: 180px;
 }
 
-.pgn_game_item {
-    padding: 6px 10px;
-    background: #2a2a2a;
-    border-radius: 3px;
+.pgn_game {
+    padding: 8px 10px;
+    border-bottom: 1px solid #2a2825;
     cursor: pointer;
-    color: #ccc;
+    transition: background 0.15s;
+}
+
+.pgn_game:hover {
+    background: #2a2825;
+}
+
+.pgn_game:last-child {
+    border-bottom: none;
+}
+
+.pgn_game_white,
+.pgn_game_black {
     font-size: 12px;
-    margin-bottom: 3px;
-    transition: all 0.2s;
-    border-left: 3px solid transparent;
+    color: #c0c0c0;
 }
 
-.pgn_game_item:hover {
-    background: #3a3a3a;
-    color: #fff;
-    border-left-color: #4a90d9;
+.pgn_game_white {
+    color: #e8e8e8;
 }
 
-.pgn_game_item .game_players {
-    font-weight: 500;
-    color: #fff;
-}
-
-.pgn_game_item .game_result {
+.pgn_game_result {
     float: right;
-    color: #888;
     font-size: 11px;
+    color: #888;
+    font-weight: 500;
 }
 
-.pgn_game_item .game_event {
+.pgn_game_info {
     font-size: 10px;
     color: #666;
-    margin-top: 2px;
+    margin-top: 3px;
 }
 
 /* =====================================================

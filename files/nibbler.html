@@ -250,14 +250,15 @@
 					</div>
 				</div>
 
-				<!-- PGN Browser Panel -->
-				<div id="pgn_browser">
-					<div id="pgn_browser_title">📂 Partidas</div>
-					<div id="pgn_file_list"></div>
-					<div id="pgn_game_list"></div>
-				</div>
-
 				<div id="right_grayspace"></div>
+
+				<!-- PGN Browser Panel -->
+				<div id="pgn_panel">
+					<div id="pgn_header">
+						<select id="pgn_file_select"><option value="">-- Selecionar PGN --</option></select>
+					</div>
+					<div id="pgn_games"></div>
+				</div>
 				<div id="buttoncontrols">
 			<button class="buttonctrl_class" id="btn_to_start"></button>
 			<button class="buttonctrl_class" id="btn_backward"></button>
@@ -320,7 +321,6 @@
 	<script src="renderer/90_engine.js"></script>
 	<script src="renderer/95_hub.js"></script>
 	<script src="renderer/99_start.js"></script>
-	<script src="node_eval/node_eval.js"></script>
 	<script src="highcharts.js"></script>
 
 </body>
