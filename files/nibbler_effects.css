@@ -1,74 +1,130 @@
 /* =====================================================
-   🎨 EFEITOS VISUAIS PARA NIBBLER - VERSÃO CORRIGIDA
+   EFEITOS VISUAIS NIBBLER - VERSÃO CORRIGIDA
+   Sem opacity: 0 em keyframes com forwards
    ===================================================== */
 
 /* ===================================
-   EFEITO AZUL - EXPLOSÃO NA ORIGEM
+   EFEITO AZUL - ORIGEM DO LANCE
    =================================== */
-@keyframes nibbler-origin-explosion {
+@keyframes nibbler-origin-effect {
     0% {
-        box-shadow: 
+        box-shadow:
             inset 0 0 40px 20px rgba(0, 191, 255, 1),
             0 0 30px 10px rgba(0, 191, 255, 0.8);
-        transform: scale(1);
-        opacity: 1;
-    }
-    40% {
-        box-shadow: 
-            inset 0 0 80px 40px rgba(0, 191, 255, 1),
-            0 0 50px 25px rgba(0, 191, 255, 1);
-        transform: scale(1.15);
-        opacity: 0.95;
+        transform: scale(1.05);
     }
     100% {
-        box-shadow: 
-            inset 0 0 100px 50px rgba(0, 191, 255, 0.2),
-            0 0 70px 35px rgba(0, 191, 255, 0);
+        box-shadow: none;
         transform: scale(1);
-        opacity: 0;
     }
 }
 
 #boardfriends td.nibbler-move-origin {
-    animation: nibbler-origin-explosion 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
+    animation: nibbler-origin-effect 0.6s ease-out forwards !important;
     position: relative !important;
     z-index: 150 !important;
 }
 
 /* ===================================
-   EFEITO AZUL - PULSO NO DESTINO
+   EFEITO AZUL - DESTINO DO LANCE
    =================================== */
-@keyframes nibbler-dest-pulse {
+@keyframes nibbler-dest-effect {
     0% {
-        box-shadow: 
+        box-shadow:
             inset 0 0 30px 15px rgba(0, 191, 255, 0.6),
             0 0 20px 10px rgba(0, 191, 255, 0.5);
         transform: scale(1);
     }
     30% {
-        box-shadow: 
+        box-shadow:
             inset 0 0 70px 35px rgba(0, 191, 255, 1),
             0 0 40px 20px rgba(0, 191, 255, 0.8);
         transform: scale(1.08);
     }
-    60% {
-        box-shadow: 
-            inset 0 0 50px 25px rgba(0, 191, 255, 0.8),
-            0 0 30px 15px rgba(0, 191, 255, 0.6);
-        transform: scale(1.02);
-    }
     100% {
-        box-shadow: 
-            inset 0 0 0 0 rgba(0, 191, 255, 0),
-            0 0 0 0 rgba(0, 191, 255, 0);
+        box-shadow: none;
         transform: scale(1);
     }
 }
 
 #boardfriends td.nibbler-move-destination {
-    animation: nibbler-dest-pulse 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
+    animation: nibbler-dest-effect 1s ease-out forwards !important;
     position: relative !important;
     z-index: 150 !important;
+}
+
+/* ===================================
+   EFEITO TRILHA
+   =================================== */
+@keyframes nibbler-trail-effect {
+    0% {
+        box-shadow: 0 0 30px 15px rgba(0, 191, 255, 0.8);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: none;
+        transform: scale(1);
+    }
+}
+
+#boardfriends td.nibbler-move-trail {
+    animation: nibbler-trail-effect 0.4s ease-out forwards !important;
+    position: relative !important;
+    z-index: 140 !important;
+}
+
+/* ===================================
+   EFEITO MATE - ORIGEM (VERMELHO)
+   =================================== */
+@keyframes nibbler-mate-origin {
+    0% {
+        box-shadow:
+            inset 0 0 40px 20px rgba(255, 0, 0, 1),
+            0 0 30px 15px rgba(255, 0, 0, 0.8);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: none;
+        transform: scale(1);
+    }
+}
+
+#boardfriends td.nibbler-mate-origin,
+#boardsquares td.nibbler-mate-origin {
+    animation: nibbler-mate-origin 0.8s ease-out forwards !important;
+    position: relative !important;
+    z-index: 200 !important;
+}
+
+/* ===================================
+   EFEITO MATE - DESTINO (VERMELHO)
+   =================================== */
+@keyframes nibbler-mate-destination {
+    0% {
+        box-shadow:
+            inset 0 0 50px 25px rgba(255, 0, 0, 0.8),
+            0 0 40px 20px rgba(255, 0, 0, 0.6);
+        transform: scale(1);
+    }
+    30% {
+        box-shadow:
+            inset 0 0 80px 40px rgba(255, 0, 0, 1),
+            0 0 60px 30px rgba(255, 0, 0, 1);
+        transform: scale(1.1);
+    }
+    100% {
+        box-shadow:
+            inset 0 0 20px 10px rgba(255, 0, 0, 0.3),
+            0 0 15px 8px rgba(255, 0, 0, 0.2);
+        transform: scale(1);
+    }
+}
+
+#boardfriends td.nibbler-mate-destination,
+#boardsquares td.nibbler-mate-destination {
+    animation: nibbler-mate-destination 1.2s ease-out forwards !important;
+    position: relative !important;
+    z-index: 200 !important;
 }
 
 /* ===================================
@@ -87,40 +143,36 @@
     font-weight: bold;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     z-index: 99999;
-    box-shadow: 
-        0 20px 60px rgba(0, 0, 0, 0.8),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
     border: 5px solid;
-    animation: nibbler-popup-sequence 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     pointer-events: none;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-@keyframes nibbler-popup-sequence {
+/* Popup usa animação separada (pode ter opacity porque é removido do DOM depois) */
+@keyframes nibbler-popup-appear {
     0% {
         opacity: 0;
         transform: translate(-50%, -50%) scale(0.5);
     }
-    12% {
+    15% {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(1.12);
+        transform: translate(-50%, -50%) scale(1.1);
     }
-    20% {
-        transform: translate(-50%, -50%) scale(0.98);
-    }
-    28% {
-        transform: translate(-50%, -50%) scale(1.02);
-    }
-    80% {
+    85% {
         opacity: 1;
         transform: translate(-50%, -50%) scale(1);
     }
     100% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.85);
+        transform: translate(-50%, -50%) scale(0.9);
     }
+}
+
+.nibbler-quality-popup.animate {
+    animation: nibbler-popup-appear 1.4s ease-out forwards;
 }
 
 /* ===================================
@@ -128,8 +180,13 @@
    =================================== */
 #boardfriends td.nibbler-move-origin,
 #boardfriends td.nibbler-move-destination,
+#boardfriends td.nibbler-move-trail,
+#boardfriends td.nibbler-mate-origin,
+#boardfriends td.nibbler-mate-destination,
+#boardsquares td.nibbler-mate-origin,
+#boardsquares td.nibbler-mate-destination,
 .nibbler-quality-popup {
-    will-change: transform, opacity, box-shadow;
+    will-change: transform, box-shadow;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 }
@@ -139,310 +196,25 @@
    =================================== */
 @media (prefers-reduced-motion: reduce) {
     #boardfriends td.nibbler-move-origin,
-    #boardfriends td.nibbler-move-destination {
+    #boardfriends td.nibbler-move-destination,
+    #boardfriends td.nibbler-move-trail,
+    #boardfriends td.nibbler-mate-origin,
+    #boardfriends td.nibbler-mate-destination,
+    #boardsquares td.nibbler-mate-origin,
+    #boardsquares td.nibbler-mate-destination {
         animation: none !important;
-        box-shadow: inset 0 0 30px 15px rgba(0, 191, 255, 0.6) !important;
     }
-    
+
     .nibbler-quality-popup {
         animation: none !important;
         opacity: 1 !important;
-        transform: translate(-50%, -50%) !important;
     }
 }
 
-/* =====================================================
-   EFEITOS VISUAIS PARA NIBBLER
-   ===================================================== */
-
-/* Efeito de explosão na origem (azul) */
-@keyframes nibbler-origin-explosion {
-    0% {
-        box-shadow: 
-            inset 0 0 40px 20px rgba(0, 191, 255, 1),
-            0 0 30px 10px rgba(0, 191, 255, 0.8);
-        transform: scale(1);
-        opacity: 1;
-    }
-    40% {
-        box-shadow: 
-            inset 0 0 80px 40px rgba(0, 191, 255, 1),
-            0 0 50px 25px rgba(0, 191, 255, 1);
-        transform: scale(1.15);
-        opacity: 0.95;
-    }
-    100% {
-        box-shadow: 
-            inset 0 0 100px 50px rgba(0, 191, 255, 0.2),
-            0 0 70px 35px rgba(0, 191, 255, 0);
-        transform: scale(1);
-        opacity: 0;
-    }
-}
-
-#boardfriends td.nibbler-move-origin {
-    animation: nibbler-origin-explosion 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
-    position: relative !important;
-    z-index: 150 !important;
-}
-
-/* Efeito de pulso no destino (azul) */
-@keyframes nibbler-dest-pulse {
-    0% {
-        box-shadow: 
-            inset 0 0 30px 15px rgba(0, 191, 255, 0.6),
-            0 0 20px 10px rgba(0, 191, 255, 0.5);
-        transform: scale(1);
-    }
-    30% {
-        box-shadow: 
-            inset 0 0 70px 35px rgba(0, 191, 255, 1),
-            0 0 40px 20px rgba(0, 191, 255, 0.8);
-        transform: scale(1.08);
-    }
-    60% {
-        box-shadow: 
-            inset 0 0 50px 25px rgba(0, 191, 255, 0.8),
-            0 0 30px 15px rgba(0, 191, 255, 0.6);
-        transform: scale(1.02);
-    }
-    100% {
-        box-shadow: 
-            inset 0 0 0 0 rgba(0, 191, 255, 0),
-            0 0 0 0 rgba(0, 191, 255, 0);
-        transform: scale(1);
-    }
-}
-
-#boardfriends td.nibbler-move-destination {
-    animation: nibbler-dest-pulse 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
-    position: relative !important;
-    z-index: 150 !important;
-}
-
-/* Popup de qualidade do lance */
-.nibbler-quality-popup {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.95);
-    color: white;
-    padding: 30px 60px;
-    border-radius: 18px;
-    font-size: 2em;
-    font-weight: bold;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    z-index: 99999;
-    box-shadow: 
-        0 20px 60px rgba(0, 0, 0, 0.8),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    border: 5px solid;
-    animation: nibbler-popup-sequence 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    pointer-events: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-@keyframes nibbler-popup-sequence {
-    0% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.5);
-    }
-    12% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1.12);
-    }
-    20% {
-        transform: translate(-50%, -50%) scale(0.98);
-    }
-    28% {
-        transform: translate(-50%, -50%) scale(1.02);
-    }
-    80% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-    }
-    100% {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.85);
-    }
-}
-
-/* Performance - GPU Acceleration */
-#boardfriends td.nibbler-move-origin,
-#boardfriends td.nibbler-move-destination,
-.nibbler-quality-popup {
-    will-change: transform, opacity, box-shadow;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-}
-
-/* Trilha de movimento entre origem e destino */
-@keyframes nibbler-trail-effect {
-    0% {
-        opacity: 0;
-        transform: scale(0.8);
-    }
-    50% {
-        opacity: 1;
-        transform: scale(1.1);
-    }
-    100% {
-        opacity: 0;
-        transform: scale(1);
-    }
-}
-
-#boardfriends td.nibbler-move-trail {
-    animation: nibbler-trail-effect 0.4s ease-out !important;
-    box-shadow: 0 0 20px 10px rgba(0, 191, 255, 0.6) !important;
-    position: relative !important;
-    z-index: 140 !important;
-}
-
-.nibbler-move-origin {
-    animation: fadeOrigin 0.6s ease-out;
-}
-
-.nibbler-move-destination {
-    animation: glowDestination 1s ease-out;
-    /* Este box-shadow é o que faz o brilho azul */
-    box-shadow: 0 0 20px 5px rgba(66, 135, 245, 0.8) !important;
-}
-
-@keyframes fadeOrigin {
-    0% {
-        box-shadow: 0 0 25px 8px rgba(66, 135, 245, 0.9);
-        background-color: rgba(66, 135, 245, 0.3);
-    }
-    100% {
-        box-shadow: none;
-        background-color: transparent;
-    }
-}
-
-@keyframes glowDestination {
-    0% {
-        box-shadow: 0 0 30px 10px rgba(66, 135, 245, 1);
-        background-color: rgba(66, 135, 245, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 20px 5px rgba(66, 135, 245, 0.8);
-    }
-    100% {
-        box-shadow: none;
-        background-color: transparent;
-    }
-}
-/* =====================================================
-   🎯 EFEITO DE TRILHA ANIMADA (RASTRO DA PEÇA)
-   ===================================================== */
-
-/* Casa de ORIGEM - Pulso forte que desaparece */
-@keyframes nibbler-origin-pulse {
-    0% {
-        box-shadow: 
-            inset 0 0 60px 30px rgba(0, 191, 255, 1),
-            0 0 40px 20px rgba(0, 191, 255, 1);
-        background-color: rgba(0, 191, 255, 0.5);
-        transform: scale(1);
-    }
-    50% {
-        box-shadow: 
-            inset 0 0 80px 40px rgba(0, 191, 255, 1),
-            0 0 60px 30px rgba(0, 191, 255, 0.8);
-        background-color: rgba(0, 191, 255, 0.6);
-        transform: scale(1.1);
-    }
-    100% {
-        box-shadow: none;
-        background-color: transparent;
-        transform: scale(1);
-        opacity: 0;
-    }
-}
-
-#boardfriends td.nibbler-move-origin {
-    animation: nibbler-origin-pulse 0.8s ease-out forwards !important;
-    position: relative !important;
-    z-index: 200 !important;
-}
-
-/* Casa de DESTINO - Brilho persistente */
-@keyframes nibbler-destination-glow {
-    0% {
-        box-shadow: 
-            inset 0 0 50px 25px rgba(0, 191, 255, 0.8),
-            0 0 35px 15px rgba(0, 191, 255, 0.6);
-        background-color: rgba(0, 191, 255, 0.4);
-        transform: scale(1);
-    }
-    30% {
-        box-shadow: 
-            inset 0 0 90px 45px rgba(0, 191, 255, 1),
-            0 0 50px 25px rgba(0, 191, 255, 1);
-        background-color: rgba(0, 191, 255, 0.5);
-        transform: scale(1.12);
-    }
-    60% {
-        box-shadow: 
-            inset 0 0 60px 30px rgba(0, 191, 255, 0.9),
-            0 0 40px 20px rgba(0, 191, 255, 0.7);
-        transform: scale(1.05);
-    }
-    100% {
-        box-shadow: 
-            inset 0 0 30px 15px rgba(0, 191, 255, 0.3),
-            0 0 20px 10px rgba(0, 191, 255, 0.2);
-        background-color: transparent;
-        transform: scale(1);
-    }
-}
-
-#boardfriends td.nibbler-move-destination {
-    animation: nibbler-destination-glow 1.2s ease-out forwards !important;
-    position: relative !important;
-    z-index: 200 !important;
-}
-
-/* TRILHA INTERMEDIÁRIA - Efeito de passagem */
-@keyframes nibbler-trail-pass {
-    0% {
-        box-shadow: 
-            inset 0 0 40px 20px rgba(0, 191, 255, 0.7),
-            0 0 30px 15px rgba(0, 191, 255, 0.5);
-        background-color: rgba(0, 191, 255, 0.3);
-        opacity: 0;
-        transform: scale(0.9);
-    }
-    30% {
-        box-shadow: 
-            inset 0 0 70px 35px rgba(0, 191, 255, 1),
-            0 0 50px 25px rgba(0, 191, 255, 0.8);
-        background-color: rgba(0, 191, 255, 0.5);
-        opacity: 1;
-        transform: scale(1.08);
-    }
-    100% {
-        box-shadow: none;
-        background-color: transparent;
-        opacity: 0;
-        transform: scale(1);
-    }
-}
-
-#boardfriends td.nibbler-move-trail {
-    animation: nibbler-trail-pass 0.5s ease-out forwards !important;
-    position: relative !important;
-    z-index: 180 !important;
-}
-
-/* Performance */
-#boardfriends td.nibbler-move-origin,
-#boardfriends td.nibbler-move-destination,
-#boardfriends td.nibbler-move-trail {
-    will-change: transform, opacity, box-shadow, background-color;
-    backface-visibility: hidden;
+/* ===================================
+   PROTEÇÃO: Garante opacidade
+   =================================== */
+#boardfriends td,
+#boardsquares td {
+    opacity: 1 !important;
 }

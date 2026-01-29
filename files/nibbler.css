@@ -1535,3 +1535,60 @@ span.nobr {
 #btn_zoom_in:hover {
     background-color: #4caf50;
 }
+
+/* =====================================================
+   BARRA DE AVALIAÇÃO ESTILO CHESS.COM
+   ===================================================== */
+
+#eval_bar_container {
+    position: relative;
+    grid-area: a;
+    width: 28px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 100;
+    pointer-events: none;
+    margin-left: -8px;
+}
+
+#eval_bar {
+    width: 24px;
+    height: calc(100% - 30px);
+    background: #262421;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    border: 1px solid #444;
+}
+
+#eval_bar_white {
+    background: linear-gradient(to bottom, #f0f0f0, #e8e8e8);
+    width: 100%;
+    height: 50%;
+    transition: height 0.3s ease-out;
+}
+
+#eval_bar_black {
+    background: linear-gradient(to bottom, #1a1a1a, #262626);
+    width: 100%;
+    height: 50%;
+    transition: height 0.3s ease-out;
+}
+
+#eval_bar_value {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    background: #333;
+    padding: 4px 6px;
+    border-radius: 3px;
+    margin-top: 4px;
+    min-width: 28px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}

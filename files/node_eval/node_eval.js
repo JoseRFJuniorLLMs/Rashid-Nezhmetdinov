@@ -771,12 +771,114 @@ function parsePVString(pvString) {
 }
 
 // ===================================
+// 🎯 SETA DE TRAJETÓRIA DO MOVIMENTO
+// ===================================
+let lastMoveArrow = { from: null, to: null };
+
+function drawMoveTrajectoryArrow(fromSquare, toSquare) {
+    if (!fromSquare || !toSquare) return;
+
+    // Salva o último movimento para redesenhar se necessário
+    lastMoveArrow = { from: fromSquare, to: toSquare };
+
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Converte coordenadas de xadrez para canvas
+    const from = fromSquare.toLowerCase();
+    const to = toSquare.toLowerCase();
+
+    let fromCol = from.charCodeAt(0) - 97;
+    let fromRow = 8 - parseInt(from[1]); // Inverte para coordenadas de canvas
+    let toCol = to.charCodeAt(0) - 97;
+    let toRow = 8 - parseInt(to[1]);
+
+    // Lida com tabuleiro virado (flip)
+    if (config && config.flip) {
+        fromCol = 7 - fromCol;
+        fromRow = 7 - fromRow;
+        toCol = 7 - toCol;
+        toRow = 7 - toRow;
+    }
+
+    // Obtém tamanho da casa
+    const squareSize = config.square_size || (canvas.width / 8);
+
+    // Calcula centro das casas
+    const x1 = (fromCol + 0.5) * squareSize;
+    const y1 = (fromRow + 0.5) * squareSize;
+    const x2 = (toCol + 0.5) * squareSize;
+    const y2 = (toRow + 0.5) * squareSize;
+
+    // Cor azul cyan (mesma dos efeitos)
+    const arrowColor = 'rgba(0, 191, 255, 0.85)';
+    const arrowWidth = Math.max(8, squareSize * 0.12);
+    const headLength = squareSize * 0.35;
+
+    // Calcula ângulo da seta
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+
+    // Ponto onde a ponta da seta começa (um pouco antes do destino)
+    const tipX = x2 - Math.cos(angle) * (squareSize * 0.2);
+    const tipY = y2 - Math.sin(angle) * (squareSize * 0.2);
+
+    // Desenha a linha da seta
+    ctx.save();
+    ctx.strokeStyle = arrowColor;
+    ctx.fillStyle = arrowColor;
+    ctx.lineWidth = arrowWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Sombra para destaque
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+
+    // Linha principal
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+
+    // Ponta da seta (triângulo)
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(
+        x2 - headLength * Math.cos(angle - Math.PI / 6),
+        y2 - headLength * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+        x2 - headLength * Math.cos(angle + Math.PI / 6),
+        y2 - headLength * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+
+    console.log(`🎯 [SETA] Desenhada de ${fromSquare} para ${toSquare}`);
+}
+
+// Limpa a seta do canvas
+function clearMoveTrajectoryArrow() {
+    lastMoveArrow = { from: null, to: null };
+}
+
+// ===================================
 // ✨ EFEITO AZUL COM TRILHA ANIMADA (ORIGINAL)
 // ===================================
 function applySquareEffect(fromSquare, toSquare) {
     clearSquareEffects();
 
     if (!fromSquare || !toSquare) return;
+
+    // Desenha a seta de trajetória
+    drawMoveTrajectoryArrow(fromSquare, toSquare);
 
     const from = fromSquare.toLowerCase();
     const to = toSquare.toLowerCase();
@@ -1020,7 +1122,66 @@ function node_eval_changed() {
 // ===================================
 // 🆕 DRAW_NODE_EVAL - COM ANIMAÇÃO DE MATE
 // ===================================
+// ===================================
+// 📊 ATUALIZA BARRA DE AVALIAÇÃO (ESTILO CHESS.COM)
+// ===================================
+function updateEvalBar(evalValue) {
+    const container = document.getElementById('eval_bar_container');
+    const evalBar = document.getElementById('eval_bar');
+    const whiteBar = document.getElementById('eval_bar_white');
+    const blackBar = document.getElementById('eval_bar_black');
+    const valueDisplay = document.getElementById('eval_bar_value');
+
+    if (!whiteBar || !blackBar || !valueDisplay) return;
+
+    // Ajusta altura da barra para corresponder ao tabuleiro
+    if (container && evalBar && config && config.board_size) {
+        container.style.height = config.board_size + 'px';
+        evalBar.style.height = (config.board_size - 30) + 'px';
+    }
+
+    // evalValue: 50 = igual, >50 = brancas melhor, <50 = pretas melhor
+    // Converte para porcentagem (0-100)
+    let whitePercent = evalValue;
+
+    // Limita entre 5% e 95% para sempre mostrar algo
+    whitePercent = Math.max(5, Math.min(95, whitePercent));
+
+    whiteBar.style.height = whitePercent + '%';
+    blackBar.style.height = (100 - whitePercent) + '%';
+
+    // Calcula o valor para exibir (em peões)
+    // evalValue 50 = 0.0, 60 = +1.0, 40 = -1.0
+    let pawnValue = (evalValue - 50) / 10;
+
+    // Formata o texto
+    let displayText;
+    if (Math.abs(pawnValue) > 10) {
+        // Mate
+        displayText = pawnValue > 0 ? 'M' : '-M';
+    } else {
+        displayText = (pawnValue >= 0 ? '+' : '') + pawnValue.toFixed(1);
+    }
+
+    valueDisplay.textContent = displayText;
+
+    // Cor do texto baseada na avaliação
+    if (pawnValue > 0.5) {
+        valueDisplay.style.background = '#f0f0f0';
+        valueDisplay.style.color = '#1a1a1a';
+    } else if (pawnValue < -0.5) {
+        valueDisplay.style.background = '#1a1a1a';
+        valueDisplay.style.color = '#f0f0f0';
+    } else {
+        valueDisplay.style.background = '#666';
+        valueDisplay.style.color = '#fff';
+    }
+}
+
 function draw_node_eval() {
+    // Atualiza o nome da abertura
+    load_book_moves();
+
     if (!is_eval_visible) {
         return;
     }
@@ -1039,6 +1200,10 @@ function draw_node_eval() {
     if (eval_info_list.length !== 0) {
         parent_eval = parent_info_list[0].value() * 100;
         current_eval = 100 - eval_info_list[0].value() * 100;
+
+        // 📊 Atualiza a barra de avaliação
+        // current_eval: 0-100 onde 50 é igual
+        updateEvalBar(current_eval);
 
         eval_diff = current_eval - parent_eval;
 
@@ -1473,45 +1638,65 @@ function draw_node_eval() {
 function load_book_moves() {
     // === ATUALIZA O NOME DA ABERTURA ===
     const el = document.getElementById('openingname_text');
-    
-    if (el) {
-        let moveList = document.getElementById('movelist');
-        let lances = '';
-        
-        if (moveList) {
-            let texto = moveList.textContent || '';
-            lances = texto.replace(/\d+\./g, '').trim().replace(/\s+/g, ' ');
-        }
-        
-        console.log('📝 [BOOK] Lances:', lances);
-        
-        if (!lances || lances.length < 3) {
-            el.textContent = 'Starting Position';
-            el.style.color = '#fff';
-            
-            if (last_opening_shown !== 'start') {
-                last_opening_shown = 'start';
-            }
+
+    if (!el) return;
+
+    // Usa o eval_node para pegar a história de lances
+    if (!eval_node) {
+        el.textContent = 'Starting Position';
+        el.style.color = '#fff';
+        return;
+    }
+
+    // Constrói a string de lances no formato "1. e4 e5 2. Nf3"
+    let nodes = [];
+    let node = eval_node;
+    while (node && node.move) {
+        nodes.unshift(node);
+        node = node.parent;
+    }
+
+    if (nodes.length === 0) {
+        el.textContent = 'Starting Position';
+        el.style.color = '#fff';
+        last_opening_shown = 'start';
+        return;
+    }
+
+    // Monta a string de lances com números
+    let lances = '';
+    for (let i = 0; i < nodes.length; i++) {
+        let n = nodes[i];
+        let moveNum = Math.floor(i / 2) + 1;
+        let isWhite = (i % 2 === 0);
+
+        if (isWhite) {
+            lances += moveNum + '. ' + n.nice_move() + ' ';
         } else {
-            let abertura = buscar_abertura(lances);
-            
-            if (abertura) {
-                let eco = abertura.eco || '???';
-                el.innerHTML = `<span style="color:#2196f3;font-weight:bold">${abertura.name}</span> <span style="background:#4caf50;color:white;padding:2px 8px;border-radius:3px;font-size:10px;margin-left:5px">${eco}</span>`;
-                el.style.color = '#fff';
-                
-                let chave = abertura.name + eco;
-                if (last_opening_shown !== chave) {
-                    last_opening_shown = chave;
-                    mostrar_popup_abertura(abertura);
-                    console.log('✅ [BOOK] Abertura:', abertura.name);
-                }
-            } else {
-                el.textContent = 'Unknown Opening';
-                el.style.color = '#999';
-                last_opening_shown = null;
-            }
+            lances += n.nice_move() + ' ';
         }
+    }
+    lances = lances.trim();
+
+    console.log('📝 [BOOK] Lances formatados:', lances);
+
+    let abertura = buscar_abertura(lances);
+
+    if (abertura) {
+        let eco = abertura.eco || '???';
+        el.innerHTML = `<span style="color:#2196f3;font-weight:bold">${abertura.name}</span> <span style="background:#4caf50;color:white;padding:2px 8px;border-radius:3px;font-size:10px;margin-left:5px">${eco}</span>`;
+        el.style.color = '#fff';
+
+        let chave = abertura.name + eco;
+        if (last_opening_shown !== chave) {
+            last_opening_shown = chave;
+            mostrar_popup_abertura(abertura);
+            console.log('✅ [BOOK] Abertura:', abertura.name);
+        }
+    } else {
+        el.textContent = lances.length > 30 ? 'Theory ends here' : 'Unknown Opening';
+        el.style.color = '#999';
+        last_opening_shown = null;
     }
 
     // 🔥 NÃO POPULAR O CACHE (para mostrar TODAS as setas)
