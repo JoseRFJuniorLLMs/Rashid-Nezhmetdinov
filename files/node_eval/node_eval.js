@@ -1907,3 +1907,183 @@ function update_score() {
     `;
     document.head.appendChild(style);
 })();
+
+// =====================================================
+// 📂 PGN BROWSER - NAVEGADOR DE PARTIDAS
+// =====================================================
+
+const fs = require('fs');
+const path = require('path');
+
+let pgnBrowserCurrentFile = null;
+let pgnBrowserGames = [];
+
+// Inicializa o navegador de PGN quando a página carregar
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initPgnBrowser, 1000);
+});
+
+function initPgnBrowser() {
+    const fileList = document.getElementById('pgn_file_list');
+    if (!fileList) {
+        console.log('PGN Browser: elemento não encontrado, tentando novamente...');
+        setTimeout(initPgnBrowser, 500);
+        return;
+    }
+
+    loadPgnFiles();
+}
+
+function loadPgnFiles() {
+    const fileList = document.getElementById('pgn_file_list');
+    if (!fileList) return;
+
+    // Caminho para pasta pgn (relativo ao diretório do app)
+    const pgnDir = path.join(__dirname, '..', 'pgn');
+
+    try {
+        if (!fs.existsSync(pgnDir)) {
+            fileList.innerHTML = '<div style="color:#666;padding:10px;">Pasta pgn não encontrada</div>';
+            console.log('PGN Browser: pasta pgn não existe em', pgnDir);
+            return;
+        }
+
+        const files = fs.readdirSync(pgnDir).filter(f => f.endsWith('.pgn'));
+
+        if (files.length === 0) {
+            fileList.innerHTML = '<div style="color:#666;padding:10px;">Nenhum arquivo PGN encontrado</div>';
+            return;
+        }
+
+        fileList.innerHTML = '';
+
+        files.forEach(file => {
+            const item = document.createElement('div');
+            item.className = 'pgn_file_item';
+            item.innerHTML = `<span class="pgn_file_icon">📄</span><span>${file.replace('.pgn', '')}</span>`;
+            item.onclick = () => selectPgnFile(file, item);
+            fileList.appendChild(item);
+        });
+
+        console.log(`📂 PGN Browser: ${files.length} arquivos encontrados`);
+
+    } catch (e) {
+        console.error('Erro ao carregar arquivos PGN:', e);
+        fileList.innerHTML = '<div style="color:#f44;padding:10px;">Erro ao carregar arquivos</div>';
+    }
+}
+
+function selectPgnFile(filename, element) {
+    // Remove seleção anterior
+    document.querySelectorAll('.pgn_file_item').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+
+    pgnBrowserCurrentFile = filename;
+
+    const pgnDir = path.join(__dirname, '..', 'pgn');
+    const filePath = path.join(pgnDir, filename);
+
+    try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const games = parsePgnGames(content);
+        pgnBrowserGames = games;
+        displayGameList(games);
+        console.log(`📂 PGN Browser: ${games.length} partidas em ${filename}`);
+    } catch (e) {
+        console.error('Erro ao ler arquivo PGN:', e);
+    }
+}
+
+function parsePgnGames(content) {
+    const games = [];
+    const gameBlocks = content.split(/\n\n(?=\[Event)/);
+
+    gameBlocks.forEach((block, index) => {
+        if (!block.trim()) return;
+
+        const game = {
+            index: index,
+            headers: {},
+            moves: ''
+        };
+
+        // Extrai headers
+        const headerRegex = /\[(\w+)\s+"([^"]*)"\]/g;
+        let match;
+        while ((match = headerRegex.exec(block)) !== null) {
+            game.headers[match[1]] = match[2];
+        }
+
+        // Extrai movimentos (depois dos headers)
+        const movesStart = block.lastIndexOf(']\n');
+        if (movesStart > -1) {
+            game.moves = block.substring(movesStart + 2).trim();
+        }
+
+        if (game.headers.White || game.headers.Black) {
+            games.push(game);
+        }
+    });
+
+    return games;
+}
+
+function displayGameList(games) {
+    const gameList = document.getElementById('pgn_game_list');
+    if (!gameList) return;
+
+    if (games.length === 0) {
+        gameList.innerHTML = '<div style="color:#666;padding:10px;">Nenhuma partida encontrada</div>';
+        return;
+    }
+
+    gameList.innerHTML = '';
+
+    games.forEach((game, index) => {
+        const white = game.headers.White || 'Brancas';
+        const black = game.headers.Black || 'Pretas';
+        const result = game.headers.Result || '*';
+        const event = game.headers.Event || '';
+        const date = game.headers.Date || '';
+
+        const item = document.createElement('div');
+        item.className = 'pgn_game_item';
+        item.innerHTML = `
+            <div class="game_players">${white} vs ${black}</div>
+            <span class="game_result">${result}</span>
+            <div class="game_event">${event} ${date}</div>
+        `;
+        item.onclick = () => loadGame(index);
+        gameList.appendChild(item);
+    });
+}
+
+function loadGame(index) {
+    const game = pgnBrowserGames[index];
+    if (!game) return;
+
+    console.log(`📂 Carregando partida: ${game.headers.White} vs ${game.headers.Black}`);
+
+    // Constrói o PGN completo
+    let pgn = '';
+    for (const [key, value] of Object.entries(game.headers)) {
+        pgn += `[${key} "${value}"]\n`;
+    }
+    pgn += '\n' + game.moves;
+
+    // Usa a função do hub para carregar o PGN
+    if (typeof hub !== 'undefined' && hub.load_from_string) {
+        hub.load_from_string(pgn);
+    } else {
+        // Fallback: tenta encontrar outra forma de carregar
+        console.log('Hub não disponível, tentando método alternativo...');
+        try {
+            // Tenta usar o método do ipcRenderer
+            if (typeof ipcRenderer !== 'undefined') {
+                ipcRenderer.send('call', { fn: 'load_from_string', args: [pgn] });
+            }
+        } catch (e) {
+            console.error('Erro ao carregar partida:', e);
+        }
+    }
+}

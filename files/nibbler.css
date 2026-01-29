@@ -1537,6 +1537,110 @@ span.nobr {
 }
 
 /* =====================================================
+   PGN BROWSER PANEL
+   ===================================================== */
+
+#pgn_browser {
+    background: #2a2a2a;
+    border-radius: 8px;
+    margin: 10px 0;
+    padding: 10px;
+    max-height: 300px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#pgn_browser_title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    padding: 8px;
+    background: linear-gradient(135deg, #4a90d9, #357abd);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+#pgn_file_list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.pgn_file_item {
+    padding: 8px 12px;
+    background: #3a3a3a;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #ddd;
+    font-size: 13px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pgn_file_item:hover {
+    background: #4a4a4a;
+    color: #fff;
+}
+
+.pgn_file_item.active {
+    background: #4a90d9;
+    color: #fff;
+}
+
+.pgn_file_icon {
+    font-size: 16px;
+}
+
+#pgn_game_list {
+    flex: 1;
+    overflow-y: auto;
+    background: #1a1a1a;
+    border-radius: 4px;
+    padding: 4px;
+    max-height: 180px;
+}
+
+.pgn_game_item {
+    padding: 6px 10px;
+    background: #2a2a2a;
+    border-radius: 3px;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 12px;
+    margin-bottom: 3px;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.pgn_game_item:hover {
+    background: #3a3a3a;
+    color: #fff;
+    border-left-color: #4a90d9;
+}
+
+.pgn_game_item .game_players {
+    font-weight: 500;
+    color: #fff;
+}
+
+.pgn_game_item .game_result {
+    float: right;
+    color: #888;
+    font-size: 11px;
+}
+
+.pgn_game_item .game_event {
+    font-size: 10px;
+    color: #666;
+    margin-top: 2px;
+}
+
+/* =====================================================
    BARRA DE AVALIAÇÃO ESTILO CHESS.COM
    ===================================================== */
 
