@@ -351,6 +351,21 @@ function menu_build() {
 					type: "separator"
 				},
 				{
+					label: "Import games from Lichess...",
+					click: () => {
+						win.webContents.send("call", "import_lichess");
+					}
+				},
+				{
+					label: "Import games from Chess.com...",
+					click: () => {
+						win.webContents.send("call", "import_chesscom");
+					}
+				},
+				{
+					type: "separator"
+				},
+				{
 					label: "Load FEN / PGN from clipboard",
 					accelerator: "CommandOrControl+Shift+V",
 					click: () => {
