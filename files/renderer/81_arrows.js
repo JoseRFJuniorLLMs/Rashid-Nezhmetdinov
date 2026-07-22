@@ -226,10 +226,9 @@ let arrow_props = {
 	// linhas de seta usam este ctx antes do texto, e essas não desenham texto —
 	// por isso duplicar aqui afeta apenas o número no arrowhead.
 	// Tamanho do número proporcional ao QUADRADO (robusto — não depende do
-	// formato de config.board_font, que podia não começar por dígito) e
-	// claramente grande/legível: ~46% do quadrado, com o dobro do configurado
-	// como piso.
-	let arrow_font_px = Math.max((parseFloat(config.board_font) * 2) || 0, Math.round(config.square_size * 0.46));
+	// formato de config.board_font). ~21% do quadrado ≈ 25px num tabuleiro
+	// grande; piso de 16px para não ficar minúsculo em tabuleiros pequenos.
+	let arrow_font_px = Math.max(16, Math.round(config.square_size * 0.21));
 	boardctx.font = `${arrow_font_px}px Arial`;
 
 	for (let o of arrows) {
