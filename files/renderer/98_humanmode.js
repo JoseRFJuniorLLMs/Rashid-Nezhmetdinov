@@ -136,26 +136,34 @@
 		state.on = !state.on;
 		ui.style.display = state.on ? "block" : "none";
 		let btn = document.getElementById("hm_button");
-		if (btn) btn.style.background = state.on ? "#4a90d9" : "#333";
+		if (btn) btn.style.backgroundColor = state.on ? "#4a90d9" : "";	// realce quando ligado
 		if (state.on) {
 			reset_clocks();
-			face(active_side());
+			face(active_side());				// vira p/ o lado a jogar ficar em baixo
 			if (!state.timer) state.timer = setInterval(tick, 100);
 		} else {
 			state.running = false;
+			face("w");							// ao desligar, volta a orientação normal (brancas em baixo)
 		}
 	}
 
+	// Botão JUNTO dos outros, na barra #buttoncontrols, com a mesma classe/estilo.
 	function build_button() {
 		if (document.getElementById("hm_button")) return;
 		let btn = document.createElement("button");
 		btn.id = "hm_button";
-		btn.textContent = "👤 Humano";
+		btn.className = "buttonctrl_class";
+		btn.textContent = "👤";
 		btn.title = "Modo Humano — 2 jogadores + relógio de xadrez";
-		btn.style.cssText = "position:fixed;top:12px;right:16px;z-index:99998;padding:8px 12px;border:none;border-radius:8px;" +
-			"background:#333;color:#fff;cursor:pointer;font-size:13px;font-family:sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.4);";
+		btn.style.fontFamily = "sans-serif";	// ChessV3 (fonte dos outros) não tem o emoji
 		btn.onclick = toggle;
-		document.body.appendChild(btn);
+		let bar = document.getElementById("buttoncontrols");
+		if (bar) {
+			bar.appendChild(btn);
+		} else {								// fallback: flutuante, caso a barra não exista
+			btn.style.cssText += ";position:fixed;top:12px;right:16px;z-index:99998;";
+			document.body.appendChild(btn);
+		}
 	}
 
 	// Hook em hub.move: troca o relógio + vira o tabuleiro em cada lance válido.
