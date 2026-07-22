@@ -461,6 +461,7 @@ let hub_props = {
 		if (this.window_resize_time && performance.now() - this.window_resize_time > 1000) {
 			this.window_resize_time = null;
 			this.save_window_size();
+			this.fit_board_to_window();		// maximiza o tabuleiro após o resize assentar
 		}
 	},
 
@@ -2375,6 +2376,25 @@ let hub_props = {
 		this.rebuild_sizes();
 	},
 
+	fit_board_to_window: function() {
+		// Maximiza o tabuleiro ao espaço disponível (antes ficava no tamanho fixo
+		// de config.board_size, pequeno no canto). O painel direito escala junto
+		// com o tabuleiro (zoomf = board/1280), ocupando ~o mesmo que ele — por
+		// isso ~metade da largura da janela fica para o tabuleiro e ~metade para o
+		// painel; a altura reserva as barras de jogador (topo) + statusbox (base).
+		let avail_h = window.innerHeight - 150;
+		let avail_w = window.innerWidth * 0.50;
+		let sz = Math.max(320, Math.min(avail_h, avail_w));
+		if (!Number.isFinite(sz)) {
+			return;
+		}
+		// Só reconstrói se o tamanho do quadrado mudou de facto (evita trabalho
+		// e flicker quando o resize não altera a dimensão efetiva).
+		if (Math.floor(sz / 8) !== config.square_size) {
+			this.set_board_size(sz);
+		}
+	},
+
 	change_piece_set: function(directory) {
 		if (directory) {
 			console.log(directory);
@@ -2424,7 +2444,15 @@ let hub_props = {
 
 		boardfriends.width = canvas.width = boardsquares.width = config.board_size;
 		boardfriends.height = canvas.height = boardsquares.height = config.board_size;
-		
+
+		// A barra de avaliação (grid-area "a", sobreposta ao tabuleiro) acompanha
+		// SEMPRE o tabuleiro. Antes só era redimensionada dentro de updateEvalBar
+		// (durante a análise), ficando com a altura antiga após um resize.
+		let eval_container = document.getElementById("eval_bar_container");
+		let eval_bar = document.getElementById("eval_bar");
+		if (eval_container) eval_container.style.height = config.board_size + "px";
+		if (eval_bar) eval_bar.style.height = (config.board_size - 30) + "px";
+
 		let zoomf = canvas.height / 1280;
 
 		playerinfo_upper.style["zoom"] = `${zoomf}`;

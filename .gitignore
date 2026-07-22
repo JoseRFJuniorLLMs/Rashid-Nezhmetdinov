@@ -1,0 +1,11 @@
+# Engines de xadrez (binários grandes — baixados localmente, não versionados)
+engine/
+
+# Backups gerados pelo apply_redesign.js
+backup_*/
+
+# Build output do electron-builder
+dist/
+
+# Logs
+*.log

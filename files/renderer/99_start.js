@@ -415,3 +415,7 @@ function enter_loop() {
 enter_loop();
 
 hub.rebuild_sizes();
+
+// Maximiza o tabuleiro ao espaço da janela no arranque (depois de a janela
+// assentar no seu tamanho final). O resize handler mantém-no ajustado depois.
+setTimeout(() => hub.fit_board_to_window(), 250);
