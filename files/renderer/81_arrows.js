@@ -225,7 +225,12 @@ let arrow_props = {
 	// Número (força/score) na ponta da seta: 2x maior para legibilidade. Só as
 	// linhas de seta usam este ctx antes do texto, e essas não desenham texto —
 	// por isso duplicar aqui afeta apenas o número no arrowhead.
-	boardctx.font = config.board_font.replace(/^(\d+(?:\.\d+)?)/, (m) => String(parseFloat(m) * 2));
+	// Tamanho do número proporcional ao QUADRADO (robusto — não depende do
+	// formato de config.board_font, que podia não começar por dígito) e
+	// claramente grande/legível: ~46% do quadrado, com o dobro do configurado
+	// como piso.
+	let arrow_font_px = Math.max((parseFloat(config.board_font) * 2) || 0, Math.round(config.square_size * 0.46));
+	boardctx.font = `${arrow_font_px}px Arial`;
 
 	for (let o of arrows) {
 
