@@ -222,7 +222,10 @@ let arrow_props = {
 	boardctx.lineWidth = config.arrow_width;
 	boardctx.textAlign = "center";
 	boardctx.textBaseline = "middle";
-	boardctx.font = config.board_font;
+	// Número (força/score) na ponta da seta: 2x maior para legibilidade. Só as
+	// linhas de seta usam este ctx antes do texto, e essas não desenham texto —
+	// por isso duplicar aqui afeta apenas o número no arrowhead.
+	boardctx.font = config.board_font.replace(/^(\d+(?:\.\d+)?)/, (m) => String(parseFloat(m) * 2));
 
 	for (let o of arrows) {
 
@@ -257,12 +260,6 @@ let arrow_props = {
 	for (let o of heads) {
 
 		let cc2 = CanvasCoords(o.x2, o.y2);
-
-		boardctx.fillStyle = o.colour;
-		boardctx.beginPath();
-		boardctx.arc(cc2.cx, cc2.cy, config.arrowhead_radius, 0, 2 * Math.PI);
-		boardctx.fill();
-		boardctx.fillStyle = "black";
 
 		let s = "?";
 
@@ -304,6 +301,15 @@ let arrow_props = {
 			s = "?";
 		}
 
+		// Círculo de fundo dimensionado para CONTER o número (agora 2x): cresce
+		// se o número for largo, mas nunca encolhe abaixo do raio configurado.
+		let head_r = Math.max(config.arrowhead_radius, boardctx.measureText(s).width / 2 + 6);
+		boardctx.fillStyle = o.colour;
+		boardctx.beginPath();
+		boardctx.arc(cc2.cx, cc2.cy, head_r, 0, 2 * Math.PI);
+		boardctx.fill();
+
+		boardctx.fillStyle = "black";
 		boardctx.fillText(s, cc2.cx, cc2.cy + 1);
 	}
 
