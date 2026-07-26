@@ -43,9 +43,11 @@
 	function now() { return performance.now(); }
 	function active_side() { try { return hub.tree.node.board.active; } catch (e) { return "w"; } }
 
-	// Vira o tabuleiro para `side` ("w"/"b") ficar EM BAIXO (reusa toggle_flip).
+	// Vira o tabuleiro para `side` ("w"/"b") ficar EM BAIXO (reusa toggle_flip)
+	// e inverte o DESENHO das peças a condizer (frente-a-frente).
 	function face(side) {
 		if (config.flip !== (side === "b")) { hub.toggle_flip(); }
+		sync_piece_rotation();
 	}
 
 	// ---- DOM -----------------------------------------------------------------
@@ -58,8 +60,22 @@
 			"@keyframes hm_blink{0%,100%{box-shadow:0 0 0 6px #f1c40f, 0 0 26px 6px rgba(241,196,15,.7)}50%{box-shadow:0 0 0 6px rgba(241,196,15,0)}}" +
 			".hm_blink{animation:hm_blink .55s steps(1,end) infinite;}" +
 			"@keyframes hm_pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}" +
-			".hm_pulse{animation:hm_pulse .55s ease-in-out infinite;}";
+			".hm_pulse{animation:hm_pulse .55s ease-in-out infinite;}" +
+			// Frente-a-frente: quando o tabuleiro está virado (vez do adversário),
+			// roda 180° o DESENHO de cada peça, no lugar (não mexe nas casas nem
+			// nos cliques), para o jogador do lado oposto as ler direito.
+			"#boardfriends.hm-invert td, #boardsquares.hm-invert td{transform:rotate(180deg);}";
 		document.head.appendChild(st);
+	}
+
+	// Sincroniza a inversão dos desenhos das peças com o estado do flip.
+	function sync_piece_rotation() {
+		inject_style();
+		let invert = state.on && config.flip;
+		let bf = document.getElementById("boardfriends");
+		let bs = document.getElementById("boardsquares");
+		if (bf) bf.classList.toggle("hm-invert", invert);
+		if (bs) bs.classList.toggle("hm-invert", invert);
 	}
 
 	function build_ui() {
